@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace "com.zaffox.discordwear"
-    compileSdk 35
+    compileSdk 36
+    buildToolsVersion "36.0.0"
 
     lint { //stupid lint keeps crashing 3:<
         checkReleaseBuilds = false
@@ -17,9 +18,9 @@ android {
     defaultConfig {
         applicationId "com.zaffox.discordwear"
         minSdk 30
-        targetSdk 35
-        versionCode 7
-        versionName "1.5"
+        targetSdk 36
+        versionCode 8
+        versionName "1.5.1"
     }
 
     dexOptions {

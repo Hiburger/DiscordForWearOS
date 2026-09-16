@@ -17,12 +17,6 @@ jobs:
           distribution: 'zulu'
           java-version: 17
 
-      - name: Generate Gradle wrapper
-        run: gradle wrapper --gradle-version 8.9 --distribution-type bin
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
       - name: Decode Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/release-key.jks

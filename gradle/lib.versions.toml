@@ -1,5 +1,5 @@
 [versions]
-agp = "8.7.3"
+agp = "8.11.1"
 kotlin = "2.0.21"
 wearComposeFoundation = "1.6.0-rc01"
 wearComposeMaterial = "1.6.0-rc01"
