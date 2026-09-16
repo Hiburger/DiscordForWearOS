@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,6 +16,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+
+// A message worth notifying the user about (a DM or a mention)
+data class MessageNotification(
+    val channelId: String,
+    val channelName: String?,
+    val guildId: String?,
+    val guildName: String?,
+    val authorName: String,
+    val content: String,
+    val isDm: Boolean
+)
 
 // A MutableMap<String, String> that writes through to SharedPreferences so
 // entries survive process death (used for channel name/guild lookups).
@@ -100,6 +112,13 @@ class DiscordRepository(token: String, private val context: Context? = null) {
     }
     private val typingJobs = mutableMapOf<String, Job>()
     private val lastSentAt = mutableMapOf<String, Long>()
+
+    // Emitted for every inbound DM or mention that should raise a notification
+    private val _notifications = MutableSharedFlow<MessageNotification>(extraBufferCapacity = 16)
+    val notifications: MutableSharedFlow<MessageNotification> = _notifications
+
+    // Channel currently on screen — notifications suppressed for it
+    @Volatile var suppressNotificationsFor: String? = null
 
     fun slowModeRemainingSeconds(channelId: String): Int {
         val ch = channelCache[channelId] ?: return 0
@@ -545,6 +564,21 @@ class DiscordRepository(token: String, private val context: Context? = null) {
                                 }
                                 _pings.update { current ->
                                     (listOf(Ping(msg, channelName, guildName)) + current).take(5)
+                                }
+                            }
+                            if (isDmChannel || msg.pingFor(myId, memberRoles)) {
+                                if (suppressNotificationsFor != msg.channelId) {
+                                    _notifications.tryEmit(MessageNotification(
+                                        channelId = msg.channelId,
+                                        channelName = channelNameCache[msg.channelId],
+                                        guildId = event.guildId ?: msg.guildId,
+                                        guildName = msg.guildId?.let { gid ->
+                                            _guilds.value.firstOrNull { it.id == gid }?.name
+                                        },
+                                        authorName = msg.author.displayName,
+                                        content = msg.content,
+                                        isDm = isDmChannel
+                                    ))
                                 }
                             }
                         }

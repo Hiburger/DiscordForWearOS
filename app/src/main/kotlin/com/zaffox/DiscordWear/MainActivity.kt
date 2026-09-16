@@ -1,8 +1,14 @@
 package com.zaffox.discordwear
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.TimeText
@@ -10,15 +16,26 @@ import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import com.zaffox.discordwear.screens.*
+import kotlinx.coroutines.flow.MutableStateFlow
 
 class MainActivity : ComponentActivity() {
     var activeChannelId: String? = null
+
+    // Channel to open from a notification tap (channelId, channelName, guildId)
+    private val pendingChat = MutableStateFlow<Triple<String, String, String?>?>(null)
+
+    private val notifPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         val token = SetupPreferences.getToken(this)
         if (token != null) discordApp.initRepository(token)
+
+        consumeIntentExtras(intent)
+        requestNotificationPermissionIfNeeded()
 
         setContent {
             MaterialTheme {
@@ -79,6 +96,7 @@ class MainActivity : ComponentActivity() {
                             val guildIdArg = back.arguments?.getString("guildId")
                             val guildId = if (guildIdArg == "dm") null else guildIdArg
                             activeChannelId = channelId
+                            discordApp.repository?.suppressNotificationsFor = channelId
 
                             ChatScreen(
                                 channelId = channelId,
@@ -111,6 +129,7 @@ class MainActivity : ComponentActivity() {
                             val guildId = back.arguments?.getString("guildId")   ?: return@composable
                             val guildName = back.arguments?.getString("guildName") ?: guildId
                             activeChannelId = null
+                            discordApp.repository?.suppressNotificationsFor = null
                             ServerChannels(
                                 guildId = guildId,
                                 guildName = guildName,
@@ -122,6 +141,7 @@ class MainActivity : ComponentActivity() {
 
                         composable("DMs") {
                             activeChannelId = null
+                            discordApp.repository?.suppressNotificationsFor = null
                             DmsScreen(onNavigateToChatScreen = { chId, chName ->
                                 navController.navigate("chatscreen/$chId/$chName/dm")
                             })
@@ -129,9 +149,20 @@ class MainActivity : ComponentActivity() {
 
                         composable("servers") {
                             activeChannelId = null
+                            discordApp.repository?.suppressNotificationsFor = null
                             ServerScreen(onNavigateToChannels = { gId, gName ->
                                 navController.navigate("ServerChannels/$gId/$gName")
                             })
+                        }
+                    }
+
+                    androidx.compose.runtime.LaunchedEffect(Unit) {
+                        pendingChat.collect { target ->
+                            if (target != null) {
+                                val (chId, chName, gId) = target
+                                pendingChat.value = null
+                                navController.navigate("chatscreen/$chId/$chName/${gId ?: "dm"}")
+                            }
                         }
                     }
                 }
@@ -139,8 +170,35 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun consumeIntentExtras(intent: Intent?) {
+        val channelId = intent?.getStringExtra(EXTRA_CHANNEL_ID) ?: return
+        val channelName = intent.getStringExtra(EXTRA_CHANNEL_NAME) ?: channelId
+        val guildId = intent.getStringExtra(EXTRA_GUILD_ID)
+        pendingChat.value = Triple(channelId, channelName, guildId)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        consumeIntentExtras(intent)
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+        ) {
+            notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         discordApp.repository?.refreshOnResume(activeChannelId)
+    }
+
+    companion object {
+        const val EXTRA_CHANNEL_ID = "extra_channel_id"
+        const val EXTRA_CHANNEL_NAME = "extra_channel_name"
+        const val EXTRA_GUILD_ID = "extra_guild_id"
     }
 }

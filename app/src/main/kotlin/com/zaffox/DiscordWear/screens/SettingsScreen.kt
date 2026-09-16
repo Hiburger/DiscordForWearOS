@@ -44,6 +44,15 @@ fun SettingsScreen(
     var compactMode by remember {
         mutableStateOf(SetupPreferences.getCompactMode(context))
     }
+    var notificationsEnabled by remember {
+        mutableStateOf(SetupPreferences.isNotificationsEnabled(context))
+    }
+    var notifyDms by remember {
+        mutableStateOf(SetupPreferences.isNotifyDms(context))
+    }
+    var notifyMentions by remember {
+        mutableStateOf(SetupPreferences.isNotifyMentions(context))
+    }
 
     var showLogoutConfirm by remember { mutableStateOf(false) }
     val updateState by UpdateChecker.state.collectAsState()
@@ -159,6 +168,51 @@ fun SettingsScreen(
                         SetupPreferences.setCompactMode(context, it)
                     },
                     label    = { Text("Compact messages", style = MaterialTheme.typography.bodySmall) }
+                )
+            }
+
+            item {
+                Text(
+                    "NOTIFICATIONS",
+                    style  = MaterialTheme.typography.labelSmall,
+                    color  = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp)
+                )
+            }
+
+            item {
+                SwitchButton(
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    checked  = notificationsEnabled,
+                    onCheckedChange = {
+                        notificationsEnabled = it
+                        SetupPreferences.setNotificationsEnabled(context, it)
+                    },
+                    label    = { Text("New message alerts", style = MaterialTheme.typography.bodySmall) }
+                )
+            }
+
+            item {
+                SwitchButton(
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    checked  = notifyDms,
+                    onCheckedChange = {
+                        notifyDms = it
+                        SetupPreferences.setNotifyDms(context, it)
+                    },
+                    label    = { Text("Direct messages", style = MaterialTheme.typography.bodySmall) }
+                )
+            }
+
+            item {
+                SwitchButton(
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    checked  = notifyMentions,
+                    onCheckedChange = {
+                        notifyMentions = it
+                        SetupPreferences.setNotifyMentions(context, it)
+                    },
+                    label    = { Text("Server mentions", style = MaterialTheme.typography.bodySmall) }
                 )
             }
 

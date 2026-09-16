@@ -11,6 +11,9 @@ object SetupPreferences {
     private const val KEY_SPOILER_REVEAL_ON_TAP = "spoiler_reveal_on_tap"
     private const val KEY_SHOW_MENTION_BADGES = "show_mention_badges"
     private const val KEY_COMPACT_MODE = "compact_mode"
+    private const val KEY_NOTIF_ENABLED = "notifications_enabled"
+    private const val KEY_NOTIF_DMS = "notifications_dms"
+    private const val KEY_NOTIF_MENTIONS = "notifications_mentions"
 
     fun saveToken(context: Context, token: String) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -72,6 +75,33 @@ object SetupPreferences {
     }
 
     fun isSetupComplete(context: Context): Boolean = getToken(context) != null
+
+    fun isNotificationsEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_NOTIF_ENABLED, true)
+
+    fun setNotificationsEnabled(context: Context, value: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit { putBoolean(KEY_NOTIF_ENABLED, value) }
+    }
+
+    fun isNotifyDms(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_NOTIF_DMS, true)
+
+    fun setNotifyDms(context: Context, value: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit { putBoolean(KEY_NOTIF_DMS, value) }
+    }
+
+    fun isNotifyMentions(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_NOTIF_MENTIONS, true)
+
+    fun setNotifyMentions(context: Context, value: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit { putBoolean(KEY_NOTIF_MENTIONS, value) }
+    }
     private const val KEY_PINNED_SERVERS = "pinned_servers"
 
     fun getPinnedServers(context: Context): Set<String> =

@@ -17,9 +17,11 @@ class DiscordWearApp : Application() {
         val repo = DiscordRepository(token, context = this)
         repo.connect()
         repository = repo
+        NotificationService.start(this)
     }
 
     fun clearRepository() {
+        NotificationService.stop(this)
         repository?.disconnect()
         repository = null
     }

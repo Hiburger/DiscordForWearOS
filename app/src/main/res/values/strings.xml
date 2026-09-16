@@ -2,4 +2,10 @@
 <resources>
     <string name="app_name">DiscordWear</string>
     <string name="home_title">Discord</string>
+
+    <string name="notif_channel_status">Connection</string>
+    <string name="notif_channel_messages">Messages</string>
+    <string name="notif_channel_messages_desc">New direct messages and mentions</string>
+    <string name="notif_listening_title">DiscordWear is connected</string>
+    <string name="notif_listening_text">Listening for new messages</string>
 </resources>
