@@ -11,6 +11,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import java.time.ZoneId
 
 class DiscordRestClient(private val token: String) {
 
@@ -28,8 +29,13 @@ class DiscordRestClient(private val token: String) {
             .url("$baseUrl$path")
             .header("Authorization", token)
             .header("User-Agent", DiscordHttp.USER_AGENT)
+            .header("Cookie", "locale=en-US;")
             .header("X-Super-Properties", DiscordHttp.superProperties)
             .header("X-Discord-Locale", "en-US")
+            .header("X-Discord-Timezone", ZoneId.systemDefault().id)
+            .header("Sec-Ch-Ua", '"Not=A?Brand";v="99", "Google Chrome";v="151", "Chromium";v="151"')
+            .header("Sec-Ch-Ua-Mobile", "?0")
+            .header("Sec-Ch-Ua-Platform", "Windows")
             .header("Origin", "https://discord.com")
             .header("Referer", "https://discord.com/")
 
