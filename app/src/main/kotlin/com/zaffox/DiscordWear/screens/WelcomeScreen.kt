@@ -243,8 +243,9 @@ fun WelcomeScreen(onSetupComplete: () -> Unit, onNavigateToQrLogin: () -> Unit) 
                 }
                 item {
                     Text(
-                        "Manual: log in to discord.com on a computer, press F12, open the Application tab, " +
-                            "expand Local Storage, click https://discord.com and copy the value of the \"token\" key.",
+                        "Manual: log in to discord.com on a computer, press F12, open the Network tab, " +
+                            "reload the page, tap any request starting with \"api\" and copy its \"Authorization\" " +
+                            "header value. That string is your token.",
                         style = MaterialTheme.typography.labelSmall,
                         textAlign = TextAlign.Center,
                         modifier = Modifier

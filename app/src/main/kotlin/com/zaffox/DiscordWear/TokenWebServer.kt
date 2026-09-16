@@ -164,9 +164,9 @@ class TokenWebServer(
     <ol>
       <li>Log in to <b>discord.com</b> in your computer's browser</li>
       <li>Press <b>F12</b> (or Ctrl+Shift+I) to open Developer Tools</li>
-      <li>Open the <b>Application</b> tab (Firefox: <b>Storage</b>)</li>
-      <li>Under <b>Local Storage</b>, click <b>https://discord.com</b></li>
-      <li>Find the <b>token</b> key and copy its value</li>
+      <li>Open the <b>Network</b> tab, then reload the page (F5)</li>
+      <li>Click any request starting with <b>api</b> (e.g. /api/v9/users/@me/…)</li>
+      <li>Under <b>Request Headers</b>, copy the value of <b>Authorization</b> — that is your token</li>
     </ol>
     <p style="margin-top:8px">Prefer the easy way ? Use <b>Scan QR Code</b> on your watch instead — no token needed.</p>
   </details>
