@@ -16,8 +16,36 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 
-class DiscordRepository(token: String, private val context: Context? = null) {
+// A MutableMap<String, String> that writes through to SharedPreferences so
+// entries survive process death (used for channel name/guild lookups).
+private class PersistedStringMap(private val prefs: SharedPreferences?, private val key: String) {
+    private val map: MutableMap<String, String> = run {
+        val m = linkedMapOf<String, String>()
+        val p = prefs
+        if (p != null) runCatching {
+            val json = JSONObject(p.getString(key, "{}") ?: "{}")
+            for (k in json.keys()) m[k] = json.optString(k)
+        }
+        m
+    }
 
+    operator fun get(k: String): String? = synchronized(map) { map[k] }
+    operator fun set(k: String, v: String) = synchronized(map) {
+        map[k] = v
+        persist()
+    }
+
+    fun toMap(): Map<String, String> = synchronized(map) { map.toMap() }
+
+    private fun persist() {
+        val p = prefs ?: return
+        val json = JSONObject()
+        for ((k, v) in map) json.put(k, v)
+        p.edit().putString(key, json.toString()).apply()
+    }
+}
+
+class DiscordRepository(token: String, private val context: Context? = null) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val rest = DiscordRestClient(token)
     private val gateway = DiscordGateway(token)
@@ -60,8 +88,8 @@ class DiscordRepository(token: String, private val context: Context? = null) {
         override fun removeEldestEntry(eldest: Map.Entry<String, List<StickerItem>>?) =
             size > 10 // Keep max 10 guilds' stickers in cache
     }
-    private val channelNameCache = mutableMapOf<String, String>()
-    private val channelGuildCache = mutableMapOf<String, String>()
+    private val channelNameCache = PersistedStringMap(prefs, "channel_names")
+    private val channelGuildCache = PersistedStringMap(prefs, "channel_guilds")
     private val memberRolesCache = object : LinkedHashMap<String, List<String>>(32, 0.75f, true) {
         override fun removeEldestEntry(eldest: Map.Entry<String, List<String>>?) =
             size > 100 // Max 100 user role lookups cached

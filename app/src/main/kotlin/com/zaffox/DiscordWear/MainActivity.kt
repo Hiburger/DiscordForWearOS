@@ -87,7 +87,8 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToProfile = { userId, user ->
                                     val encodedName = java.net.URLEncoder.encode(user?.displayName ?: userId, "UTF-8")
                                     navController.navigate("userprofile/$userId/$encodedName")
-                                }
+                                },
+                                onBack = { navController.popBackStack() }
                             )
                         }
 

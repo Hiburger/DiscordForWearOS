@@ -56,13 +56,13 @@ fun HomeScreen(
     // so cards appear immediately on load, not only after a new message arrives
     val channelNames = remember(readState) { repo.getChannelNames() }
     val channelGuilds = remember(readState) { repo.getChannelGuilds() }
-    data class MentionEntry(val channelId: String, val channelName: String, val guildName: String?, val count: Int, val isDm: Boolean)
+    data class MentionEntry(val channelId: String, val channelName: String?, val guildName: String?, val count: Int, val isDm: Boolean)
     val mentionEntries = remember(readState, dmIds, channelNames, channelGuilds, guilds) {
         readState.entries
             .filter { it.value.mentionCount > 0 }
             .map { (channelId, state) ->
                 val isDm = channelId in dmIds
-                val chName = channelNames[channelId] ?: channelId
+                val chName = channelNames[channelId]
                 val guildId = channelGuilds[channelId]
                 val guildName = guildId?.let { id -> guilds.firstOrNull { it.id == id }?.name }
                 MentionEntry(channelId, chName, guildName, state.mentionCount, isDm)
@@ -147,13 +147,14 @@ fun HomeScreen(
                 // readState-derived cards (visible from startup)
                 items(mentionEntries.size) { index ->
                     val entry = mentionEntries[index]
-                    val label = if (entry.isDm) "DM • ${entry.channelName}"
-                                else "${entry.guildName ?: "Server"} • #${entry.channelName}"
+                    val label = if (entry.isDm) "DM • ${entry.channelName ?: "Unknown"}"
+                                else entry.channelName?.let { "${entry.guildName ?: "Server"} • #$it" }
+                                    ?: (entry.guildName ?: "Server")
                     MentionCard(
                         label = label,
                         count = entry.count,
                         onClick = {
-                            onNavigateToChat(entry.channelId, entry.channelName, if (entry.isDm) null else channelGuilds[entry.channelId])
+                            onNavigateToChat(entry.channelId, entry.channelName ?: entry.channelId, if (entry.isDm) null else channelGuilds[entry.channelId])
                         }
                     )
                 }

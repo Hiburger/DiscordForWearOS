@@ -65,7 +65,8 @@ fun ChatScreen(
     channelName: String,
     guildId: String? = null,
     currentUserId: String = "",
-    onNavigateToProfile: ((userId: String, user: DiscordUser?) -> Unit)? = null
+    onNavigateToProfile: ((userId: String, user: DiscordUser?) -> Unit)? = null,
+    onBack: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val repo = context.discordApp.repository
@@ -480,7 +481,23 @@ fun ChatScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         ScreenScaffold(scrollState = listState) {
             ScalingLazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-            item(key = "channel_title") { Text("#$channelName", style = MaterialTheme.typography.titleMedium) }
+            item(key = "channel_title") {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.back),
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clickable(onClick = onBack)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("#$channelName", style = MaterialTheme.typography.titleMedium)
+                }
+            }
 
             if (pendingText.isNotBlank()) {
                 item(key = "pending_text") {
