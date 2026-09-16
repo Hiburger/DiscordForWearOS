@@ -74,9 +74,9 @@ class DiscordGateway(private val token: String) {
             .put("token", token)
             .put("intents", INTENTS)
             .put("properties", JSONObject()
-                .put("\$os", "android")
-                .put("\$browser", "discord_wear")
-                .put("\$device", "wearos"))
+                .put("\$os", "Windows")
+                .put("\$browser", "Chrome")
+                .put("\$device", ""))
         send(Op.IDENTIFY, d)
     }
 

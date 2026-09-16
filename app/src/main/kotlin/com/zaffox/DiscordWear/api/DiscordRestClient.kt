@@ -20,14 +20,18 @@ class DiscordRestClient(private val token: String) {
         .writeTimeout(10, TimeUnit.SECONDS)
         .build()
 
-    private val baseUrl = "https://discord.com/api/v10"
+    private val baseUrl = DiscordHttp.REST_BASE_URL
     private val jsonMime = "application/json; charset=utf-8".toMediaType()
 
     private fun buildRequest(path: String): Request.Builder =
         Request.Builder()
             .url("$baseUrl$path")
             .header("Authorization", token)
-            .header("User-Agent", "DiscordWear/1.0 (WearOS)")
+            .header("User-Agent", DiscordHttp.USER_AGENT)
+            .header("X-Super-Properties", DiscordHttp.superProperties)
+            .header("X-Discord-Locale", "en-US")
+            .header("Origin", "https://discord.com")
+            .header("Referer", "https://discord.com/")
 
     private suspend fun execute(request: Request): String = withContext(Dispatchers.IO) {
         val response = http.newCall(request).execute()
