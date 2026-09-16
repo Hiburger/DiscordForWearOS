@@ -145,6 +145,9 @@ class TokenWebServer(
   button:hover { background: #4752c4; }
   .warn { background: #f23f42; border-radius: 6px; padding: 8px 12px;
           font-size: .8rem; margin-bottom: 16px; color: #fff; }
+  .help { margin-top: 20px; font-size: .8rem; color: #949ba4; }
+  .help summary { cursor: pointer; color: #5865f2; font-weight: 600; }
+  .help ol { margin: 8px 0 0; padding-left: 20px; line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -156,6 +159,17 @@ class TokenWebServer(
     <input type="password" name="token" placeholder="Paste your Discord token…" autocomplete="off" required>
     <button type="submit">Save Token & Log me in !</button>
   </form>
+  <details class="help">
+    <summary>How do I get my token ?</summary>
+    <ol>
+      <li>Log in to <b>discord.com</b> in your computer's browser</li>
+      <li>Press <b>F12</b> (or Ctrl+Shift+I) to open Developer Tools</li>
+      <li>Open the <b>Application</b> tab (Firefox: <b>Storage</b>)</li>
+      <li>Under <b>Local Storage</b>, click <b>https://discord.com</b></li>
+      <li>Find the <b>token</b> key and copy its value</li>
+    </ol>
+    <p style="margin-top:8px">Prefer the easy way ? Use <b>Scan QR Code</b> on your watch instead — no token needed.</p>
+  </details>
 </div>
 </body>
 </html>"""

@@ -41,6 +41,7 @@ fun WelcomeScreen(onSetupComplete: () -> Unit, onNavigateToQrLogin: () -> Unit) 
     var serverStatus by remember { mutableStateOf("") }
     var serverAddresses by remember { mutableStateOf<List<String>>(emptyList()) }
     var webServer by remember { mutableStateOf<TokenWebServer?>(null) }
+    var showTokenHelp by remember { mutableStateOf(false) }
     var showQr by remember { mutableStateOf(false) }
 
     val wifiManager = remember {
@@ -205,11 +206,51 @@ fun WelcomeScreen(onSetupComplete: () -> Unit, onNavigateToQrLogin: () -> Unit) 
                     }
                 }
                 item {
+                    Text(
+                        "Open this address from a phone or PC browser on the same Wi-Fi.",
+                        style = MaterialTheme.typography.labelSmall,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                    )
+                }
+                item {
                     Button(
                          onClick = { webServer?.stop(); webServer = null; serverStatus = ""; releaseWifiLock() },
                          modifier = Modifier.fillMaxWidth().height(36.dp),
                          colors = ButtonDefaults.filledTonalButtonColors()
                     ) { Text("Stop Web Server") }
+                }
+            }
+
+            item {
+                Button(
+                    onClick = { showTokenHelp = !showTokenHelp },
+                    modifier = Modifier.fillMaxWidth().height(36.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors()
+                ) { Text(if (showTokenHelp) "Hide token help" else "How do I get a token ?") }
+            }
+
+            if (showTokenHelp) {
+                item {
+                    Text(
+                        "Easiest: use Scan QR Code above.",
+                        style = MaterialTheme.typography.labelSmall,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                item {
+                    Text(
+                        "Manual: log in to discord.com on a computer, press F12, open the Application tab, " +
+                            "expand Local Storage, click https://discord.com and copy the value of the \"token\" key.",
+                        style = MaterialTheme.typography.labelSmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp)
+                    )
                 }
             }
 
