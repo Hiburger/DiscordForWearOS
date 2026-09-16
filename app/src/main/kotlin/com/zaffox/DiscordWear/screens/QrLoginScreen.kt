@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
@@ -31,6 +32,7 @@ import com.zaffox.discordwear.discordApp
 @Composable
 fun QrLoginScreen(onSetupComplete: () -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
+    val view = LocalView.current
     val listState = rememberScalingLazyListState()
 
     var state  by remember { mutableStateOf<RemoteAuthState>(RemoteAuthState.Connecting) }
@@ -49,6 +51,11 @@ fun QrLoginScreen(onSetupComplete: () -> Unit, onBack: () -> Unit) {
         )
         client = c
         c.connect()
+    }
+
+    DisposableEffect(view) {
+        view.keepScreenOn = true
+        onDispose { view.keepScreenOn = false }
     }
 
     DisposableEffect(Unit) {
@@ -115,6 +122,17 @@ fun QrLoginScreen(onSetupComplete: () -> Unit, onBack: () -> Unit) {
                             "Profile → Scan QR Code in the Discord app",
                             style = MaterialTheme.typography.labelSmall,
                             textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp)
+                        )
+                    }
+                    item {
+                        Text(
+                            "Scan quickly — this code expires",
+                            style = MaterialTheme.typography.labelSmall,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 8.dp)
