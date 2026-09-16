@@ -288,7 +288,7 @@ fun SettingsScreen(
                 val statusText = when (val s = updateState) {
                     is UpdateChecker.UpdateState.Idle        -> "v${UpdateChecker.CURRENT_VERSION}"
                     is UpdateChecker.UpdateState.Checking    -> "Checking…"
-                    is UpdateChecker.UpdateState.UpToDate    -> "v${UpdateChecker.CURRENT_VERSION} — up to date"
+                    is UpdateChecker.UpdateState.UpToDate    -> "v${UpdateChecker.CURRENT_VERSION} (up to date)"
                     is UpdateChecker.UpdateState.UpdateAvailable -> "v${s.release.tagName} available!"
                     is UpdateChecker.UpdateState.Error       -> "Check failed: ${s.message}"
                 }

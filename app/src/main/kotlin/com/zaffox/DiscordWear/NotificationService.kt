@@ -52,7 +52,7 @@ class NotificationService : Service() {
             buildPersistentNotification(),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
         )
-        // Repository may have just been created — (re)start observing
+        // Repository may have just been created; (re)start observing
         observeNotifications()
         return START_STICKY
     }
