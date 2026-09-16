@@ -123,7 +123,7 @@ class TokenWebServer(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>DiscordWear Token Setup</title>
+<title>DiscordWear Log In</title>
 <style>
   body { font-family: system-ui, sans-serif; background: #1e1f22; color: #dbdee1;
          display: flex; flex-direction: column; align-items: center;
@@ -149,12 +149,12 @@ class TokenWebServer(
 </head>
 <body>
 <div class="card">
-  <h1>DiscordWear</h1>
-  <p>Enter your Discord token below to log in on your watch. The token is stored only on your device.</p>
-  <div class="warn">Never share your token. Only enter it on your own device.</div>
+  <h1>Let's log in !</h1>
+  <p>Please enter your Discord token below to log in on your watch. The token is stored only on your device.</p>
+  <div class="warn">Never share your token. Only enter it on your own devices.</div>
   <form method="POST" action="/">
     <input type="password" name="token" placeholder="Paste your Discord token…" autocomplete="off" required>
-    <button type="submit">Save Token</button>
+    <button type="submit">Save Token & Log me in !</button>
   </form>
 </div>
 </body>
