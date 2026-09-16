@@ -2,6 +2,7 @@
 
 [![Build DiscordWear beta](https://github.com/Hiburger/DiscordForWearOS/actions/workflows/build_Discord_Wear.yml/badge.svg)](https://github.com/Hiburger/DiscordForWearOS/actions/workflows/build_Discord_Wear.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+![install](https://img.shields.io/badge/only_installable_by_smelly_nerds-yes-red)
 
 Hi ! This is an unofficial, open-source Discord client for your Wear OS watch built and tested for **Pixel Watch** and **Galaxy Watch** (but should run on any modern WearOS).
 

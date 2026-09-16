@@ -35,13 +35,13 @@ fun QrLoginScreen(onSetupComplete: () -> Unit, onBack: () -> Unit) {
     val view = LocalView.current
     val listState = rememberScalingLazyListState()
 
-    var state  by remember { mutableStateOf<RemoteAuthState>(RemoteAuthState.Connecting) }
+    var state by remember { mutableStateOf<RemoteAuthState>(RemoteAuthState.Connecting) }
     var status by remember { mutableStateOf(RemoteAuthStatus()) }
     var client by remember { mutableStateOf<RemoteAuthClient?>(null) }
 
     LaunchedEffect(Unit) {
         val c = RemoteAuthClient(
-            onStateChange  = { newState  -> state  = newState  },
+            onStateChange = { newState -> state = newState },
             onStatusUpdate = { newStatus -> status = newStatus },
             onTokenReceived = { token ->
                 SetupPreferences.saveToken(context, token)
@@ -129,7 +129,7 @@ fun QrLoginScreen(onSetupComplete: () -> Unit, onBack: () -> Unit) {
                     }
                     item {
                         Text(
-                            "Scan quickly — this code expires",
+                            "Scan quickly; this code expires!",
                             style = MaterialTheme.typography.labelSmall,
                             textAlign = TextAlign.Center,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -205,19 +205,36 @@ fun QrLoginScreen(onSetupComplete: () -> Unit, onBack: () -> Unit) {
                         Text("Canceled", style = MaterialTheme.typography.titleSmall, textAlign = TextAlign.Center)
                     }
                     item {
-                        Text("Login was canceled on your phone.", style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
+                        Text(
+                            "Login was canceled on your phone.",
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center
+                        )
                     }
                     item {
-                        Button(onClick = { onBack() }, modifier = Modifier.fillMaxWidth(0.7f).height(32.dp)) { Text("Go Back") }
+                        Button(
+                            onClick = { onBack() },
+                            modifier = Modifier.fillMaxWidth(0.7f).height(32.dp)
+                        ) { Text("Go Back") }
                     }
                 }
 
                 is RemoteAuthState.Error -> {
                     item {
-                        Text("Error", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+                        Text(
+                            "Error",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center
+                        )
                     }
                     item {
-                        Text(s.message, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 8.dp))
+                        Text(
+                            s.message,
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
                     }
                     // Show log even on error so we can debug
                     items(status.lines.size) { i ->
@@ -230,7 +247,10 @@ fun QrLoginScreen(onSetupComplete: () -> Unit, onBack: () -> Unit) {
                         )
                     }
                     item {
-                        Button(onClick = { onBack() }, modifier = Modifier.fillMaxWidth(0.7f).height(32.dp)) { Text("Go Back") }
+                        Button(
+                            onClick = { onBack() },
+                            modifier = Modifier.fillMaxWidth(0.7f).height(32.dp)
+                        ) { Text("Go Back") }
                     }
                 }
             }
