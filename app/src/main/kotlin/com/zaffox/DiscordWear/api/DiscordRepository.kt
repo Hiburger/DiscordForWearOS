@@ -117,7 +117,7 @@ class DiscordRepository(token: String, private val context: Context? = null) {
     private val _notifications = MutableSharedFlow<MessageNotification>(extraBufferCapacity = 16)
     val notifications: MutableSharedFlow<MessageNotification> = _notifications
 
-    // Channel currently on screen — notifications suppressed for it
+    // Channel currently on screen; notifications suppressed for it
     @Volatile var suppressNotificationsFor: String? = null
 
     fun slowModeRemainingSeconds(channelId: String): Int {

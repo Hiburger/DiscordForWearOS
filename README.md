@@ -32,11 +32,12 @@ All of this from your wrist !
 2. Transfer it to your watch, either with `adb install app-release.apk` (enable ADB debugging in watch Developer options), or with a tool like *Wear Installer*
 3. If installing directly on the watch, allow installs from unknown sources when prompted
 
-### If you are upgrading from the original DiscordWear (by Zaffox)
+### Things you should know !
 
 > [!IMPORTANT]
 > If you have the original app installed, you **must uninstall it first** !  
-> This fork is signed with a different key, so installing over the original fails (with the following unclear error: "App not installed"). You will need to log in again after installing.
+> This fork is signed with a different key, so installing over the original fails (with the following unclear error: "App not installed"). You will need to log in again after installing.  
+> This is a 3rd party client, and the discord people don't like that. Using this app goes against their ToS and could lead to a ban (even if the risk is pretty low). I am not responsible for it if your account gets banned.
 
 ## Login
 

@@ -101,8 +101,10 @@ class NotificationService : Service() {
             .setSmallIcon(R.drawable.announce)
             .setContentTitle(where)
             .setContentText("${notif.authorName}: ${notif.content}".take(180))
-            .setStyle(NotificationCompat.BigTextStyle()
-                .bigText("${notif.authorName}: ${notif.content}"))
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText("${notif.authorName}: ${notif.content}")
+            )
             .setContentIntent(pending)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -130,12 +132,16 @@ class NotificationService : Service() {
     private fun createChannels() {
         val nm = getSystemService(NotificationManager::class.java) ?: return
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_STATUS, getString(R.string.notif_channel_status),
-                NotificationManager.IMPORTANCE_MIN)
+            NotificationChannel(
+                CHANNEL_STATUS, getString(R.string.notif_channel_status),
+                NotificationManager.IMPORTANCE_MIN
+            )
         )
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_MESSAGES, getString(R.string.notif_channel_messages),
-                NotificationManager.IMPORTANCE_HIGH).apply {
+            NotificationChannel(
+                CHANNEL_MESSAGES, getString(R.string.notif_channel_messages),
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
                 description = getString(R.string.notif_channel_messages_desc)
             }
         )
