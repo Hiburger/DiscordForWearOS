@@ -151,7 +151,7 @@ class TokenWebServer(
 <div class="card">
   <h1>Let's log in !</h1>
   <p>Please enter your Discord token below to log in on your watch. The token is stored only on your device.</p>
-  <div class="warn">Never share your token. Only enter it on your own devices.</div>
+  <div class="warn">Never share your token.<br>Only enter it on your own devices.</div>
   <form method="POST" action="/">
     <input type="password" name="token" placeholder="Paste your Discord token…" autocomplete="off" required>
     <button type="submit">Save Token & Log me in !</button>
