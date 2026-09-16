@@ -120,7 +120,7 @@ fun ServerChannels(
 
                         items(group.channels.size) { idx ->
                             val ch = group.channels[idx]
-                            if (!ch.hasAccess) return@items
+                            if (hideInaccessible && !ch.hasAccess) return@items
                             val rs = if (showMentionBadges) readState[ch.id] else null
                             val mentionCount = rs?.mentionCount ?: 0
                             val hasUnread = rs != null && ch.lastMessageId != null &&

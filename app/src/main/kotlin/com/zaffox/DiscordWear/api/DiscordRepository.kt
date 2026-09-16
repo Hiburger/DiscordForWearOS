@@ -238,7 +238,7 @@ class DiscordRepository(token: String, private val context: Context? = null) {
     }
 
    fun getCachedChannels(guildId: String, filterInaccessible: Boolean): List<CategoryGroup>? = runCatching {
-        val json = prefs?.getString("channels_$guildId", null) ?: return null
+        val json = prefs?.getString("channels_v2_$guildId", null) ?: return null
         val arr = JSONArray(json)
         val allChannels = Channel.listFromJson(arr)
         
@@ -266,7 +266,7 @@ class DiscordRepository(token: String, private val context: Context? = null) {
 
     fun saveChannels(guildId: String, groups: List<CategoryGroup>) = runCatching {
         val allChannels = groups.flatMap { g -> listOfNotNull(g.category) + g.channels }
-        prefs?.edit()?.putString("channels_$guildId", JSONArray(allChannels.map { it.toJson() }).toString())?.apply()
+        prefs?.edit()?.putString("channels_v2_$guildId", JSONArray(allChannels.map { it.toJson() }).toString())?.apply()
     }
 
     private val loadedChannels = mutableSetOf<String>()

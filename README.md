@@ -31,10 +31,10 @@ All of this from your wrist !
 2. Transfer it to your watch, either with `adb install app-release.apk` (enable ADB debugging in watch Developer options), or with a tool like *Wear Installer*
 3. If installing directly on the watch, allow installs from unknown sources when prompted
 
-### If you are ppgrading from the original DiscordWear (by Zaffox)
+### If you are upgrading from the original DiscordWear (by Zaffox)
 
 > [!IMPORTANT]
-> If you have the original app installed, you **must uninstall it first** !
+> If you have the original app installed, you **must uninstall it first** !  
 > This fork is signed with a different key, so installing over the original fails (with the following unclear error: "App not installed"). You will need to log in again after installing.
 
 ## Login
@@ -65,7 +65,7 @@ cd DiscordForWearOS
 
 Release builds need a keystore, provided via environment variables (see `app/build.gradle`)
 
-## Credits
+## Credits :)
 
 - Original project: [Zaffox/Discord-WearOS](https://github.com/Zaffox/Discord-WearOS) // huge thanks to [@Zaffox](https://github.com/Zaffox) for creating it
 - Licensed under [GPL-3.0](LICENSE) (like the original project)

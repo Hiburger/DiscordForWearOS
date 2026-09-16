@@ -3,6 +3,10 @@ package com.zaffox.discordwear.api
 import org.json.JSONArray
 import org.json.JSONObject
 
+// On Android, optString returns the literal string "null" for JSON null values.
+fun JSONObject.optStringOrNull(name: String): String? =
+    optString(name).takeIf { it.isNotEmpty() && it != "null" }
+
 data class DiscordUser(
     val id: String,
     val username: String,
@@ -329,11 +333,11 @@ data class Channel(
             return Channel(
                 id = o.getString("id"),
                 type = ChannelType.from(o.getInt("type")),
-                guildId = o.optString("guild_id").takeIf { it.isNotEmpty() },
+                guildId = o.optStringOrNull("guild_id"),
                 name = o.optString("name"),
-                topic = o.optString("topic").takeIf { it.isNotEmpty() },
-                lastMessageId = o.optString("last_message_id").takeIf { it.isNotEmpty() },
-                parentId = o.optString("parent_id").takeIf { it.isNotEmpty() },
+                topic = o.optStringOrNull("topic"),
+                lastMessageId = o.optStringOrNull("last_message_id"),
+                parentId = o.optStringOrNull("parent_id"),
                 position = o.optInt("position", 0),
                 permissionOverwrites = overwrites,
                 recipients = recipients,
@@ -724,7 +728,7 @@ data class DiscordMessage(
                 author = DiscordUser.fromJson(o.getJSONObject("author")),
                 content = o.optString("content", ""),
                 timestamp = o.getString("timestamp"),
-                editedTimestamp = o.optString("edited_timestamp").takeIf { it.isNotEmpty() },
+                editedTimestamp = o.optStringOrNull("edited_timestamp"),
                 attachments = attachments,
                 embeds = embeds,
                 stickers = stickers,
@@ -733,7 +737,7 @@ data class DiscordMessage(
                 mentionedUserIds = mentionedUserIds,
                 mentionedRoleIds = mentionedRoles,
                 mentionEveryone = o.optBoolean("mention_everyone", false),
-                guildId = o.optString("guild_id").takeIf { it.isNotEmpty() },
+                guildId = o.optStringOrNull("guild_id"),
                 type = msgType,
                 referencedMessage = refMsg,
                 forwardedContent = fwdContent,

@@ -11,3 +11,4 @@
 app/build/
 *.jks
 *.keystore
+*.base64
