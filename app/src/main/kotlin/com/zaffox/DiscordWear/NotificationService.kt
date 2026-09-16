@@ -70,11 +70,13 @@ class NotificationService : Service() {
         }
     }
 
-    private fun shouldNotify(notif: MessageNotification): Boolean {
-        if (!SetupPreferences.isNotificationsEnabled(this)) return false
-        return if (notif.isDm) SetupPreferences.isNotifyDms(this)
-        else SetupPreferences.isNotifyMentions(this)
-    }
+    private fun shouldNotify(notif: MessageNotification): Boolean =
+        NotificationPolicy.shouldNotify(
+            masterEnabled = SetupPreferences.isNotificationsEnabled(this),
+            notifyDms = SetupPreferences.isNotifyDms(this),
+            notifyMentions = SetupPreferences.isNotifyMentions(this),
+            notif = notif
+        )
 
     private fun postNotification(notif: MessageNotification) {
         if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) return

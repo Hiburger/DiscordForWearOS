@@ -47,6 +47,8 @@ class MainActivity : ComponentActivity() {
                     ) {
 
                         composable("home") {
+                            activeChannelId = null
+                            discordApp.repository?.suppressNotificationsFor = null
                             HomeScreen(
                                 onNavigateToDms = { navController.navigate("DMs") },
                                 onNavigateToServers = { navController.navigate("servers") },
@@ -81,6 +83,8 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable("settings") {
+                            activeChannelId = null
+                            discordApp.repository?.suppressNotificationsFor = null
                             SettingsScreen(
                                 onLogOut = {
                                     navController.navigate("Welcome") {
@@ -114,6 +118,8 @@ class MainActivity : ComponentActivity() {
                             val userId = back.arguments?.getString("userId") ?: return@composable
                             val displayName = back.arguments?.getString("displayName")
                                 ?.let { java.net.URLDecoder.decode(it, "UTF-8") } ?: userId
+                            activeChannelId = null
+                            discordApp.repository?.suppressNotificationsFor = null
                             UserProfileScreen(
                                 userId = userId,
                                 onNavigateToChat = { chId, chName ->

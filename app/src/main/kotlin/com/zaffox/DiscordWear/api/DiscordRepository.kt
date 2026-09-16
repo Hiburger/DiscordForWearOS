@@ -566,7 +566,10 @@ class DiscordRepository(token: String, private val context: Context? = null) {
                                     (listOf(Ping(msg, channelName, guildName)) + current).take(5)
                                 }
                             }
-                            if (isDmChannel || msg.pingFor(myId, memberRoles)) {
+                            // DM messages carry no guild_id, so detection works even
+                            // before the DM channel list has finished loading
+                            val isDmMsg = isDmChannel || (event.guildId == null && msg.guildId == null)
+                            if (isDmMsg || msg.pingFor(myId, memberRoles)) {
                                 if (suppressNotificationsFor != msg.channelId) {
                                     _notifications.tryEmit(MessageNotification(
                                         channelId = msg.channelId,
@@ -577,7 +580,7 @@ class DiscordRepository(token: String, private val context: Context? = null) {
                                         },
                                         authorName = msg.author.displayName,
                                         content = msg.content,
-                                        isDm = isDmChannel
+                                        isDm = isDmMsg
                                     ))
                                 }
                             }
