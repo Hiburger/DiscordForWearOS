@@ -35,7 +35,7 @@ object DiscordHttp {
             .put("release_channel", "stable")
             .put("client_build_number", 396858)
             .put("client_event_source", JSONObject.NULL)
-            .put("has_client_mods", JsonValue.FALSE)
+            .put("has_client_mods", false)
             .toString()
         Base64.encodeToString(json.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
     }
