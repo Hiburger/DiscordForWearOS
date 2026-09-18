@@ -1,6 +1,8 @@
 package com.zaffox.discordwear.api
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -53,9 +55,11 @@ class DiscordRestClient(private val token: String) {
         execute(buildRequest(path).get().build())
 
     private suspend fun post(path: String, body: JSONObject): String =
-        execute(buildRequest(path)
-            .post(body.toString().toRequestBody(jsonMime))
-            .build())
+        execute(
+            buildRequest(path)
+                .post(body.toString().toRequestBody(jsonMime))
+                .build()
+        )
 
     private suspend fun delete(path: String): String =
         execute(buildRequest(path).delete().build())
@@ -92,8 +96,18 @@ class DiscordRestClient(private val token: String) {
         filterInaccessible: Boolean = true
     ): Result<List<CategoryGroup>> = runCatching {
         val raw = Channel.listFromJson(JSONArray(get("/guilds/$guildId/channels")))
-        val member = getGuildMember(guildId).getOrNull()
-        val roles = getGuildRoles(guildId).getOrNull()
+        // Member + roles only matter for per-channel visibility. Fetch them
+        // concurrently (not sequentially) and skip them entirely when the
+        // caller doesn't filter — each round trip costs seconds on a watch.
+        val (member, roles) = if (filterInaccessible) {
+            coroutineScope {
+                val m = async { getGuildMember(guildId).getOrNull() }
+                val r = async { getGuildRoles(guildId).getOrNull() }
+                m.await() to r.await()
+            }
+        } else {
+            null to null
+        }
 
         fun canView(channel: Channel): Boolean {
             if (member == null || roles == null) return true
@@ -150,17 +164,23 @@ class DiscordRestClient(private val token: String) {
                 .use { it.body?.bytes() } ?: throw IOException("Failed to fetch GIF")
 
             val payloadJson = JSONObject()
-                .put("attachments", org.json.JSONArray().put(
-                    JSONObject().put("id", 0).put("filename", "emoji.gif")
-                ))
+                .put(
+                    "attachments", org.json.JSONArray().put(
+                        JSONObject().put("id", 0).put("filename", "emoji.gif")
+                    )
+                )
                 .toString()
 
             val multipart = MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
-                .addFormDataPart("payload_json", null,
-                    payloadJson.toRequestBody("application/json".toMediaType()))
-                .addFormDataPart("files[0]", "emoji.gif",
-                    gifBytes.toRequestBody("image/gif".toMediaType()))
+                .addFormDataPart(
+                    "payload_json", null,
+                    payloadJson.toRequestBody("application/json".toMediaType())
+                )
+                .addFormDataPart(
+                    "files[0]", "emoji.gif",
+                    gifBytes.toRequestBody("image/gif".toMediaType())
+                )
                 .build()
 
             val request = buildRequest("/channels/$channelId/messages").post(multipart).build()
@@ -176,10 +196,11 @@ class DiscordRestClient(private val token: String) {
     suspend fun sendReply(channelId: String, content: String, replyToId: String): Result<DiscordMessage> = runCatching {
         val body = JSONObject()
             .put("content", content)
-            .put("message_reference", JSONObject()
-                .put("message_id", replyToId)
-                .put("channel_id", channelId)
-                .put("fail_if_not_exists", false)
+            .put(
+                "message_reference", JSONObject()
+                    .put("message_id", replyToId)
+                    .put("channel_id", channelId)
+                    .put("fail_if_not_exists", false)
             )
         DiscordMessage.fromJson(JSONObject(post("/channels/$channelId/messages", body)))
     }
@@ -189,18 +210,21 @@ class DiscordRestClient(private val token: String) {
         Unit
     }
 
-    suspend fun editMessage(channelId: String, messageId: String, newContent: String): Result<DiscordMessage> = runCatching {
-        val body = JSONObject().put("content", newContent)
-        val req = buildRequest("/channels/$channelId/messages/$messageId")
-            .method("PATCH", body.toString().toRequestBody(jsonMime))
-            .build()
-        DiscordMessage.fromJson(JSONObject(execute(req)))
-    }
+    suspend fun editMessage(channelId: String, messageId: String, newContent: String): Result<DiscordMessage> =
+        runCatching {
+            val body = JSONObject().put("content", newContent)
+            val req = buildRequest("/channels/$channelId/messages/$messageId")
+                .method("PATCH", body.toString().toRequestBody(jsonMime))
+                .build()
+            DiscordMessage.fromJson(JSONObject(execute(req)))
+        }
 
     suspend fun sendTyping(channelId: String) {
         runCatching {
-            execute(buildRequest("/channels/$channelId/typing")
-                .post("".toRequestBody(jsonMime)).build())
+            execute(
+                buildRequest("/channels/$channelId/typing")
+                    .post("".toRequestBody(jsonMime)).build()
+            )
         }
     }
 
@@ -228,17 +252,23 @@ class DiscordRestClient(private val token: String) {
         withContext(Dispatchers.IO) {
             val payloadJson = JSONObject()
                 .put("content", caption)
-                .put("attachments", org.json.JSONArray().put(
-                    JSONObject().put("id", 0).put("filename", filename)
-                ))
+                .put(
+                    "attachments", org.json.JSONArray().put(
+                        JSONObject().put("id", 0).put("filename", filename)
+                    )
+                )
                 .toString()
 
             val multipart = MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
-                .addFormDataPart("payload_json", null,
-                    payloadJson.toRequestBody("application/json".toMediaType()))
-                .addFormDataPart("files[0]", filename,
-                    fileBytes.toRequestBody(mimeType.toMediaType()))
+                .addFormDataPart(
+                    "payload_json", null,
+                    payloadJson.toRequestBody("application/json".toMediaType())
+                )
+                .addFormDataPart(
+                    "files[0]", filename,
+                    fileBytes.toRequestBody(mimeType.toMediaType())
+                )
                 .build()
 
             val request = buildRequest("/channels/$channelId/messages").post(multipart).build()
@@ -259,22 +289,28 @@ class DiscordRestClient(private val token: String) {
     ): Result<DiscordMessage> = runCatching {
         withContext(Dispatchers.IO) {
             val payloadJson = JSONObject()
-                .put("flags", 8192) 
-                .put("attachments", org.json.JSONArray().put(
-                    JSONObject()
-                        .put("id", 0)
-                        .put("filename", "voice-message.ogg")
-                        .put("duration_secs", durationSecs)
-                        .put("waveform", waveform)
-                ))
+                .put("flags", 8192)
+                .put(
+                    "attachments", org.json.JSONArray().put(
+                        JSONObject()
+                            .put("id", 0)
+                            .put("filename", "voice-message.ogg")
+                            .put("duration_secs", durationSecs)
+                            .put("waveform", waveform)
+                    )
+                )
                 .toString()
 
             val multipart = MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
-                .addFormDataPart("payload_json", null,
-                    payloadJson.toRequestBody("application/json".toMediaType()))
-                .addFormDataPart("files[0]", "voice-message.ogg",
-                    audioBytes.toRequestBody("audio/ogg".toMediaType()))
+                .addFormDataPart(
+                    "payload_json", null,
+                    payloadJson.toRequestBody("application/json".toMediaType())
+                )
+                .addFormDataPart(
+                    "files[0]", "voice-message.ogg",
+                    audioBytes.toRequestBody("audio/ogg".toMediaType())
+                )
                 .build()
 
             val request = buildRequest("/channels/$channelId/messages").post(multipart).build()
@@ -289,15 +325,19 @@ class DiscordRestClient(private val token: String) {
 
     suspend fun addReaction(channelId: String, messageId: String, emojiKey: String): Result<Unit> = runCatching {
         val encoded = java.net.URLEncoder.encode(emojiKey, "UTF-8")
-        execute(buildRequest("/channels/$channelId/messages/$messageId/reactions/$encoded/@me")
-            .put("".toRequestBody(jsonMime)).build())
+        execute(
+            buildRequest("/channels/$channelId/messages/$messageId/reactions/$encoded/@me")
+                .put("".toRequestBody(jsonMime)).build()
+        )
         Unit
     }
 
     suspend fun removeReaction(channelId: String, messageId: String, emojiKey: String): Result<Unit> = runCatching {
         val encoded = java.net.URLEncoder.encode(emojiKey, "UTF-8")
-        execute(buildRequest("/channels/$channelId/messages/$messageId/reactions/$encoded/@me")
-            .delete().build())
+        execute(
+            buildRequest("/channels/$channelId/messages/$messageId/reactions/$encoded/@me")
+                .delete().build()
+        )
         Unit
     }
 

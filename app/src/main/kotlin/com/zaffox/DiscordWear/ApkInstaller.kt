@@ -30,19 +30,19 @@ object ApkInstaller {
         onProgress: (Float) -> Unit = {}
     ): Result<File> = withContext(Dispatchers.IO) {
         runCatching {
-            val dir  = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+            val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
                 ?: context.filesDir
             val file = File(dir, "DiscordWear-update.apk")
 
             val request = Request.Builder().url(url).build()
             http.newCall(request).execute().use { resp ->
                 if (!resp.isSuccessful) error("HTTP ${resp.code}")
-                val body          = resp.body ?: error("Empty body")
+                val body = resp.body ?: error("Empty body")
                 val contentLength = body.contentLength()   // -1 if unknown
 
                 body.source().use { source ->
                     file.outputStream().use { out ->
-                        val buffer    = ByteArray(8 * 1024)
+                        val buffer = ByteArray(8 * 1024)
                         var totalRead = 0L
                         while (true) {
                             val read = source.read(buffer)

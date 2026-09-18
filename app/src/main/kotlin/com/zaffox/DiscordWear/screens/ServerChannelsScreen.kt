@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -23,16 +24,29 @@ import com.zaffox.discordwear.api.CategoryGroup
 import com.zaffox.discordwear.api.Channel
 import com.zaffox.discordwear.api.ChannelType
 import com.zaffox.discordwear.discordApp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @Composable
 private fun ChannelIcon(ch: Channel, allChannels: List<Channel>) {
     when {
         ch.type == ChannelType.GUILD_NEWS ->
-            Icon(painter = painterResource(id = R.drawable.announce), contentDescription = "Announcement",tint = Color.White, modifier = Modifier.size(16.dp))
+            Icon(
+                painter = painterResource(id = R.drawable.announce),
+                contentDescription = "Announcement",
+                tint = Color.White,
+                modifier = Modifier.size(16.dp)
+            )
+
         ch.name.contains("rule", ignoreCase = true) &&
-            allChannels.firstOrNull { it.name.contains("rule", ignoreCase = true) }?.id == ch.id ->
-            Icon(painter = painterResource(id = R.drawable.rules), contentDescription = "Rules",tint = Color.White, modifier = Modifier.size(16.dp))
+                allChannels.firstOrNull { it.name.contains("rule", ignoreCase = true) }?.id == ch.id ->
+            Icon(
+                painter = painterResource(id = R.drawable.rules),
+                contentDescription = "Rules",
+                tint = Color.White,
+                modifier = Modifier.size(16.dp)
+            )
+
         else ->
             Text("#", fontSize = 16.sp)
     }
@@ -57,18 +71,18 @@ fun ServerChannels(
     var error by remember { mutableStateOf("") }
 
     LaunchedEffect(guildId) {
-        scope.launch {
+        scope.launch(Dispatchers.IO) {
             // Check for cached channels first
             val cached = repo?.getCachedChannels(guildId, filterInaccessible = hideInaccessible)
-            
+
             if (!cached.isNullOrEmpty()) {
                 groups = cached
                 loading = false
                 repo?.cacheChannelNames(cached)
                 return@launch  // Already have cached data, skip network call
             }
-            
-            // No cache or cache is empty — fetch from network
+
+            // No cache or cache is empty -> fetch from network
             repo?.rest?.getGuildChannels(guildId, filterInaccessible = hideInaccessible)
                 ?.onSuccess {
                     groups = it
@@ -77,9 +91,15 @@ fun ServerChannels(
                     repo.saveChannels(guildId, it)
                 }
                 ?.onFailure {
-                    if (groups.isEmpty()) { error = it.message ?: "Error"; loading = false }
+                    if (groups.isEmpty()) {
+                        error = it.message ?: "Error"; loading = false
+                    }
                 }
-                ?: run { if (groups.isEmpty()) { error = "Not connected"; loading = false } }
+                ?: run {
+                    if (groups.isEmpty()) {
+                        error = "Not connected"; loading = false
+                    }
+                }
         }
     }
 
@@ -88,18 +108,41 @@ fun ServerChannels(
     ScreenScaffold(scrollState = listState) {
         ScalingLazyColumn(state = listState) {
             item {
-                Text(guildName, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    guildName,
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
 
             when {
-                loading -> item { CircularProgressIndicator() }
+                loading -> item {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) { CircularProgressIndicator() }
+                }
+
                 error.isNotEmpty() -> item {
-                    Text(error, color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        error, color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
+
                 groups.isEmpty() -> item {
-                    Text("No text channels.", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        "No text channels", style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
+
                 else -> {
                     for (group in groups) {
                         if (group.category != null) {
@@ -124,7 +167,7 @@ fun ServerChannels(
                             val rs = if (showMentionBadges) readState[ch.id] else null
                             val mentionCount = rs?.mentionCount ?: 0
                             val hasUnread = rs != null && ch.lastMessageId != null &&
-                                ch.lastMessageId > rs.lastMessageId
+                                    ch.lastMessageId > rs.lastMessageId
                             Button(
                                 modifier = Modifier.fillMaxWidth().height(36.dp),
                                 colors = ButtonDefaults.filledTonalButtonColors(),

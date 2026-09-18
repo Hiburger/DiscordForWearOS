@@ -58,6 +58,8 @@ import kotlinx.coroutines.delay
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import java.io.File
 
+// quite a few imports
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChatScreen(
@@ -122,7 +124,7 @@ fun ChatScreen(
     val compactMode = remember { SetupPreferences.getCompactMode(context) }
     val slowModeSecs = remember(channelId) { repo.getSlowModeSeconds(channelId) }
     var slowRemaining by remember { mutableStateOf(0) }
-    
+
     LaunchedEffect(slowModeSecs) {
         if (slowModeSecs > 0) {
             while (true) {
@@ -144,7 +146,7 @@ fun ChatScreen(
     }
 
     val scrolledToUnread = remember { mutableStateOf(false) }
-    LaunchedEffect(messages.size, loading) {//scrolling to last unread message not wokring 
+    LaunchedEffect(messages.size, loading) { // scrolling to last unread message not working
         if (!loading && !scrolledToUnread.value && messages.isNotEmpty()) {
             scrolledToUnread.value = true
             val lastRead = readState[channelId]?.lastMessageId
@@ -154,6 +156,7 @@ fun ChatScreen(
                     lastReadIdx >= 0 -> {
                         scope.launch { listState.animateScrollToItem(lastReadIdx + 1) }
                     }
+
                     else -> {
                         scope.launch { listState.animateScrollToItem(1) }
                     }
@@ -194,8 +197,10 @@ fun ChatScreen(
 
     fun startRecording() {
         val hasAudio = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-            PackageManager.PERMISSION_GRANTED
-        if (!hasAudio) { micPermLauncher.launch(Manifest.permission.RECORD_AUDIO); return }
+                PackageManager.PERMISSION_GRANTED
+        if (!hasAudio) {
+            micPermLauncher.launch(Manifest.permission.RECORD_AUDIO); return
+        }
         try {
             val f = File(context.cacheDir, "voice_${System.currentTimeMillis()}.ogg")
             voiceFile = f
@@ -222,7 +227,8 @@ fun ChatScreen(
         try {
             mr.stop()
             mr.release()
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
         recorder = null
         isRecording = false
         scope.launch {
@@ -237,7 +243,10 @@ fun ChatScreen(
 
     fun cancelRecording() {
         val mr = recorder ?: return
-        try { mr.stop(); mr.release() } catch (_: Exception) {}
+        try {
+            mr.stop(); mr.release()
+        } catch (_: Exception) {
+        }
         recorder = null
         isRecording = false
         voiceFile?.delete()
@@ -249,7 +258,9 @@ fun ChatScreen(
             while (isRecording) {
                 delay(1_000)
                 recordingSecs++
-                if (recordingSecs >= 120) { stopAndSendRecording(); break }
+                if (recordingSecs >= 120) {
+                    stopAndSendRecording(); break
+                }
             }
         }
     }
@@ -365,7 +376,7 @@ fun ChatScreen(
     if (showPicker) {
         val isReactMode = reactingToMsg != null
         EmojiStickerScreen(
-            tab = if (isReactMode) 0 else tab, 
+            tab = if (isReactMode) 0 else tab,
             guildId = guildId,
             hasNitro = hasNitro,
             sendAnimatedAsGif = sendAnimatedAsGif,
@@ -388,7 +399,7 @@ fun ChatScreen(
                 } else {
                     val isAnimated = insertText.startsWith("<a:")
                     if (isAnimated && sendAnimatedAsGif) {
-                       showPicker = false
+                        showPicker = false
                         val link = buildEmojiLink(insertText)
                         scope.launch {
                             repo.sendMessage(channelId, link)
@@ -407,8 +418,11 @@ fun ChatScreen(
                 if (target != null) {
                     val reactionEmoji = ReactionEmoji(id = null, name = unicode, animated = false)
                     scope.launch {
-                        try { repo.toggleReaction(channelId, target.id, reactionEmoji) }
-                        catch (e: Exception) { sendError = "Failed: ${e.message}" }
+                        try {
+                            repo.toggleReaction(channelId, target.id, reactionEmoji)
+                        } catch (e: Exception) {
+                            sendError = "Failed: ${e.message}"
+                        }
                     }
                     reactingToMsg = null
                 } else {
@@ -424,7 +438,7 @@ fun ChatScreen(
                     try {
                         repo.sendSticker(channelId, stickerId)
                     } catch (e: Exception) {
-                       sendError = "Failed: ${e.message}"
+                        sendError = "Failed: ${e.message}"
                     }
                 }
             }
@@ -432,7 +446,7 @@ fun ChatScreen(
         return
     }
 
-   val msgForOptions = selectedMsg
+    val msgForOptions = selectedMsg
     if (msgForOptions != null) {
         MessageOptionsDialog(
             msg = msgForOptions,
@@ -443,7 +457,7 @@ fun ChatScreen(
             },
             onCopy = {
                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE)
-                    as android.content.ClipboardManager
+                        as android.content.ClipboardManager
                 clipboard.setPrimaryClip(
                     android.content.ClipData.newPlainText("message", msgForOptions.content)
                 )
@@ -481,57 +495,278 @@ fun ChatScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         ScreenScaffold(scrollState = listState) {
             ScalingLazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-            item(key = "channel_title") {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.back),
-                        contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clickable(onClick = onBack)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text("#$channelName", style = MaterialTheme.typography.titleMedium)
-                }
-            }
-
-            if (pendingText.isNotBlank()) {
-                item(key = "pending_text") {
+                item(key = "channel_title") {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                MaterialTheme.colorScheme.surfaceContainer,
-                                RoundedCornerShape(8.dp)
-                            )
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            pendingText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                            maxLines = 2
+                        Icon(
+                            painter = painterResource(id = R.drawable.back),
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clickable(onClick = onBack)
                         )
-                        Row {
+                        Spacer(Modifier.width(6.dp))
+                        Text("#$channelName", style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+
+                if (pendingText.isNotBlank()) {
+                    item(key = "pending_text") {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceContainer,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Text(
-                                "▶", //set to material send ivcon instead of Unicode
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (slowRemaining > 0)
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                else MaterialTheme.colorScheme.primary,
+                                pendingText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 2
+                            )
+                            Row {
+                                Text(
+                                    "▶", // set to material send icons instead of Unicode
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (slowRemaining > 0)
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    else MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .clickable {
+                                            if (slowRemaining > 0) return@clickable
+                                            val text = pendingText
+                                            pendingText = ""
+                                            inputText = ""
+                                            scope.launch {
+                                                slowRemaining = slowModeSecs
+                                                val replyTarget = replyingTo
+                                                if (replyTarget != null) {
+                                                    repo.sendReply(channelId, text, replyTarget.id)
+                                                        .onFailure { sendError = "Failed: ${it.message}" }
+                                                    replyingTo = null
+                                                } else {
+                                                    repo.sendMessage(channelId, text)
+                                                        .onFailure { sendError = "Failed: ${it.message}" }
+                                                }
+                                                while (true) {
+                                                    delay(1_000)
+                                                    slowRemaining = repo.slowModeRemainingSeconds(channelId)
+                                                    if (slowRemaining <= 0) break
+                                                }
+                                            }
+                                        }
+                                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                                )
+                                Text(
+                                    "X",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier
+                                        .clickable {
+                                            pendingText = ""
+                                            inputText = ""
+                                        }
+                                        .padding(4.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                when {
+                    loading -> item(key = "loading") { CircularProgressIndicator() }
+                    messages.isEmpty() -> item(key = "empty") {
+                        Text("No messages yet", style = MaterialTheme.typography.bodySmall)
+                    }
+
+                    else -> items(messages.size, key = { messages[it].id }) { index ->
+                        val msg = messages[index]
+                        val prevMsg = if (index > 0) messages[index - 1] else null
+                        fun String.toEpochMillis(): Long = runCatching {
+                            java.time.OffsetDateTime.parse(this).toInstant().toEpochMilli()
+                        }.getOrElse { 0L }
+
+                        val gapMs = if (prevMsg != null)
+                            msg.timestamp.toEpochMillis() - prevMsg.timestamp.toEpochMillis()
+                        else Long.MAX_VALUE
+
+                        val isContinuation = prevMsg != null &&
+                                prevMsg.author.id == msg.author.id &&
+                                msg.type !in listOf(19, 23) &&
+                                prevMsg.type !in listOf(19, 23) &&
+                                gapMs < 10 * 60 * 1000L
+
+                        MessageBubble(
+                            msg = msg,
+                            isOwn = msg.author.id == myId,
+                            isContinuation = isContinuation,
+                            imageLoader = imageLoader,
+                            channelNames = channelNames,
+                            compactMode = compactMode,
+                            spoilerRevealOnTap = spoilerRevealOnTap,
+                            guildId = guildId,
+                            roleColorCache = roleColorCache,
+                            onReact = { emoji ->
+                                scope.launch { repo.toggleReaction(channelId, msg.id, emoji) }
+                            },
+                            onSwipeLeft = {
+                                replyingTo = msg
+                            },
+                            onLongPress = {
+                                selectedMsg = msg
+                            },
+                            onAvatarClick = { userId ->
+                                onNavigateToProfile?.invoke(userId, msg.author.takeIf { it.id == userId })
+                            }
+                        )
+                    }
+                }
+
+                if (sendError.isNotEmpty()) {
+                    item(key = "send_error") {
+                        Text(
+                            sendError, color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+
+                // IMPORTANT: for the sake of "postérité" (look it up), i've kept the comment from the guy that created upstream. The following comment is, hence, NOT my production.
+                // this BS not worky :(
+                //  val currentTypingUsers = typingMap[channelId].orEmpty().filter { it != myId }
+                //if (currentTypingUsers.isNotEmpty()) {
+                /*  item(key = "typing_indicator") {
+                      val names = currentTypingUsers.mapNotNull { uid -> repo.getDisplayName(uid) }
+                      val label = when {
+                          names.isEmpty() -> "Someone is typing…"
+                          names.size == 1 -> "${names[0]} is typing…"
+                          names.size == 2 -> "${names[0]} and ${names[1]} are typing…"
+                          else            -> "Several people are typing…"
+                      }
+                      Text(
+                          text = label,
+                          style = MaterialTheme.typography.labelSmall,
+                          color = MaterialTheme.colorScheme.onSurfaceVariant,
+                          modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)
+                      )
+                  }
+              //}*/
+
+                item(key = "text_input") {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        if (replyingTo != null) {
+                            Row(
                                 modifier = Modifier
-                                    .clickable {
-                                        if (slowRemaining > 0) return@clickable
-                                        val text = pendingText
-                                        pendingText = ""
+                                    .fillMaxWidth()
+                                    .background(
+                                        MaterialTheme.colorScheme.secondaryContainer,
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "↩ ${replyingTo!!.author.displayName}: ${replyingTo!!.content.take(30)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(
+                                    "X",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.clickable { replyingTo = null }.padding(4.dp)
+                                )
+                            }
+                        }
+
+                        if (canSend) {
+                            OutlinedTextField(
+                                value = inputText,
+                                onValueChange = { newValue ->
+                                    inputText = newValue
+                                    pendingText = newValue
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = {
+                                    Text(
+                                        "Message #$channelName",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
+                                textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
+                                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    cursorColor = MaterialTheme.colorScheme.primary
+                                ),
+                                minLines = 1,
+                                maxLines = 4,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
+                            )
+                        } else {
+                            Text(
+                                text = "You cannot send messages here",//add lock icon from /res/drawable
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+
+                item(key = "action_buttons") {
+                    if (canSend) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(
+                                    space = 16.dp,
+                                    alignment = Alignment.CenterHorizontally
+                                )
+                            ) {
+                                FilledIconButton(
+                                    onClick = {
+                                        reactingToMsg = null
+                                        showPicker = true
+                                        tab = 0
+                                    },
+                                    modifier = Modifier.height(40.dp).width(40.dp),
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.emoji),
+                                        contentDescription = "Emoji"
+                                    )
+                                }
+                                FilledIconButton(
+                                    onClick = {
+                                        reactingToMsg = null
+                                        showPicker = true
+                                        tab = 1
+                                    },
+                                    modifier = Modifier.height(40.dp).width(40.dp),
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.sticker),
+                                        contentDescription = "Stickers"
+                                    )
+                                }
+                                FilledIconButton(
+                                    onClick = {
+                                        val text = inputText.trim()
+                                        if (text.isBlank() || slowRemaining > 0) return@FilledIconButton
                                         inputText = ""
+                                        pendingText = ""
                                         scope.launch {
                                             slowRemaining = slowModeSecs
                                             val replyTarget = replyingTo
@@ -549,312 +784,106 @@ fun ChatScreen(
                                                 if (slowRemaining <= 0) break
                                             }
                                         }
-                                    }
-                                    .padding(horizontal = 6.dp, vertical = 4.dp)
-                            )
-                            Text(
-                                "X",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .clickable {
-                                        pendingText = ""
-                                        inputText = ""
-                                    }
-                                    .padding(4.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
-            when {
-                loading -> item(key = "loading") { CircularProgressIndicator() }
-                messages.isEmpty() -> item(key = "empty") {
-                    Text("No messages yet.", style = MaterialTheme.typography.bodySmall)
-                }
-                else -> items(messages.size, key = { messages[it].id }) { index ->
-                    val msg = messages[index]
-                    val prevMsg = if (index > 0) messages[index - 1] else null
-                    fun String.toEpochMillis(): Long = runCatching {
-                        java.time.OffsetDateTime.parse(this).toInstant().toEpochMilli()
-                    }.getOrElse { 0L }
-
-                    val gapMs = if (prevMsg != null)
-                        msg.timestamp.toEpochMillis() - prevMsg.timestamp.toEpochMillis()
-                    else Long.MAX_VALUE
-
-                    val isContinuation = prevMsg != null &&
-                        prevMsg.author.id == msg.author.id &&
-                        msg.type !in listOf(19, 23) &&
-                        prevMsg.type !in listOf(19, 23) &&
-                        gapMs < 10 * 60 * 1000L
-
-                    MessageBubble(
-                        msg = msg,
-                        isOwn = msg.author.id == myId,
-                        isContinuation = isContinuation,
-                        imageLoader = imageLoader,
-                        channelNames = channelNames,
-                        compactMode = compactMode,
-                        spoilerRevealOnTap = spoilerRevealOnTap,
-                        guildId = guildId,
-                        roleColorCache = roleColorCache,
-                        onReact = { emoji ->
-                            scope.launch { repo.toggleReaction(channelId, msg.id, emoji) }
-                        },
-                        onSwipeLeft = {
-                            replyingTo = msg
-                        },
-                        onLongPress = {
-                            selectedMsg = msg
-                        },
-                        onAvatarClick = { userId ->
-                            onNavigateToProfile?.invoke(userId, msg.author.takeIf { it.id == userId })
-                        }
-                    )
-                }
-            }
-
-            if (sendError.isNotEmpty()) {
-                item(key = "send_error") {
-                    Text(sendError, color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall)
-                }
-            }
-
-            // this BS not worky :(
-          //  val currentTypingUsers = typingMap[channelId].orEmpty().filter { it != myId }
-            //if (currentTypingUsers.isNotEmpty()) {
-              /*  item(key = "typing_indicator") {
-                    val names = currentTypingUsers.mapNotNull { uid -> repo.getDisplayName(uid) }
-                    val label = when {
-                        names.isEmpty() -> "Someone is typing…"
-                        names.size == 1 -> "${names[0]} is typing…"
-                        names.size == 2 -> "${names[0]} and ${names[1]} are typing…"
-                        else            -> "Several people are typing…"
-                    }
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)
-                    )
-                }
-            //}*/
-
-            item(key = "text_input") {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    if (replyingTo != null) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    MaterialTheme.colorScheme.secondaryContainer,
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "↩ ${replyingTo!!.author.displayName}: ${replyingTo!!.content.take(30)}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Text(
-                                "X",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.clickable { replyingTo = null }.padding(4.dp)
-                            )
-                        }
-                    }
-
-                if (canSend) {
-                    OutlinedTextField(
-                        value = inputText,
-                        onValueChange = { newValue ->
-                            inputText = newValue
-                            pendingText = newValue
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Message #$channelName", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                        textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
-                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            cursorColor = MaterialTheme.colorScheme.primary
-                        ),
-                        minLines = 1,
-                        maxLines = 4,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
-                    )
-                } else {
-                    Text(
-                        text = "You cannot send messages here",//add lock icon from /res/drawable
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                    )
-                }
-                } 
-            }
-
-            item(key = "action_buttons") {
-                if (canSend) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(space = 16.dp, alignment = Alignment.CenterHorizontally)
-                ) {
-                    FilledIconButton(
-                        onClick = {
-                            reactingToMsg = null
-                            showPicker = true
-                            tab = 0
-                        },
-                        modifier = Modifier.height(40.dp).width(40.dp),
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.emoji),
-                            contentDescription = "Emoji"
-                        )
-                    }
-                    FilledIconButton(
-                        onClick = {
-                            reactingToMsg = null
-                            showPicker = true
-                            tab = 1
-                        },
-                        modifier = Modifier.height(40.dp).width(40.dp),
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.sticker),
-                            contentDescription = "Stickers"
-                        )
-                    }
-                    FilledIconButton(
-                        onClick = {
-                            val text = inputText.trim()
-                            if (text.isBlank() || slowRemaining > 0) return@FilledIconButton
-                            inputText = ""
-                            pendingText = ""
-                            scope.launch {
-                               slowRemaining = slowModeSecs
-                               val replyTarget = replyingTo
-                               if (replyTarget != null) {
-                                   repo.sendReply(channelId, text, replyTarget.id)
-                                       .onFailure { sendError = "Failed: ${it.message}" }
-                                   replyingTo = null
-                               } else {
-                                   repo.sendMessage(channelId, text)
-                                       .onFailure { sendError = "Failed: ${it.message}" }
-                               }
-                               while (true) {
-                                   delay(1_000)
-                                   slowRemaining = repo.slowModeRemainingSeconds(channelId)
-                                   if (slowRemaining <= 0) break
-                               }
-                            }
-                        },
-                        modifier = Modifier.height(40.dp).width(40.dp),
-                        enabled = inputText.isNotBlank() && slowRemaining <= 0
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.send),
-                            contentDescription = "Send"
-                        )
-                    }
-                }
-                
-                if (!isRecording) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(6.dp),
-                     horizontalArrangement = Arrangement.spacedBy(space = 16.dp, alignment = Alignment.CenterHorizontally)
-
-                    ) {
-                        FilledIconButton(
-                            onClick = {
-                                val perm = if (android.os.Build.VERSION.SDK_INT >= 33)
-                                    Manifest.permission.READ_MEDIA_IMAGES
-                                else
-                                    Manifest.permission.READ_EXTERNAL_STORAGE
-                                val hasPerm = ContextCompat.checkSelfPermission(context, perm) ==
-                                    PackageManager.PERMISSION_GRANTED
-                                if (hasPerm) {
-                                    showPhotoPicker = true
-                                } else {
-                                    imagePermLauncher.launch(perm)
+                                    },
+                                    modifier = Modifier.height(40.dp).width(40.dp),
+                                    enabled = inputText.isNotBlank() && slowRemaining <= 0
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.send),
+                                        contentDescription = "Send"
+                                    )
                                 }
-                            },
-                            modifier = Modifier.height(40.dp).width(40.dp),
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.image),
-                                contentDescription = "Upload Photo"
-                            )
-                        }
-                        FilledIconButton(
-                            onClick = { startRecording() },
-                            modifier = Modifier.height(40.dp).width(40.dp),
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.mic),
-                                contentDescription = "Voice Message"
-                            )
+                            }
+
+                            if (!isRecording) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(6.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(
+                                        space = 16.dp,
+                                        alignment = Alignment.CenterHorizontally
+                                    )
+
+                                ) {
+                                    FilledIconButton(
+                                        onClick = {
+                                            val perm = if (android.os.Build.VERSION.SDK_INT >= 33)
+                                                Manifest.permission.READ_MEDIA_IMAGES
+                                            else
+                                                Manifest.permission.READ_EXTERNAL_STORAGE
+                                            val hasPerm = ContextCompat.checkSelfPermission(context, perm) ==
+                                                    PackageManager.PERMISSION_GRANTED
+                                            if (hasPerm) {
+                                                showPhotoPicker = true
+                                            } else {
+                                                imagePermLauncher.launch(perm)
+                                            }
+                                        },
+                                        modifier = Modifier.height(40.dp).width(40.dp),
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.image),
+                                            contentDescription = "Upload Photo"
+                                        )
+                                    }
+                                    FilledIconButton(
+                                        onClick = { startRecording() },
+                                        modifier = Modifier.height(40.dp).width(40.dp),
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.mic),
+                                            contentDescription = "Voice Message"
+                                        )
+                                    }
+                                }
+                            } else {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    val mins = recordingSecs / 60
+                                    val secs = recordingSecs % 60
+                                    Text(
+                                        text = "%02d:%02d".format(mins, secs),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceEvenly
+                                    ) {
+                                        Button(
+                                            onClick = { cancelRecording() },
+                                            modifier = Modifier.weight(1f).height(34.dp),
+                                            colors = ButtonDefaults.outlinedButtonColors()
+                                        ) { Text("Cancel", fontSize = 12.sp) }
+                                        Spacer(Modifier.width(6.dp))
+                                        Button(
+                                            onClick = { stopAndSendRecording() },
+                                            modifier = Modifier.weight(1f).height(34.dp),
+                                            colors = ButtonDefaults.filledTonalButtonColors()
+                                        ) { Text("Send", fontSize = 11.sp) }
+                                    }
+                                }
+                            }
+                            if (uploadError.isNotEmpty()) {
+                                Text(
+                                    uploadError,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.clickable { uploadError = "" }
+                                )
+                            }
                         }
                     }
-                } else {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(8.dp))
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        val mins = recordingSecs / 60
-                        val secs = recordingSecs % 60
-                        Text(
-                            text = "%02d:%02d".format(mins, secs),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            Button(
-                                onClick = { cancelRecording() },
-                                modifier = Modifier.weight(1f).height(34.dp),
-                                colors = ButtonDefaults.outlinedButtonColors()
-                            ) { Text("Cancel", fontSize = 12.sp) }
-                            Spacer(Modifier.width(6.dp))
-                            Button(
-                                onClick = { stopAndSendRecording() },
-                                modifier = Modifier.weight(1f).height(34.dp),
-                                colors = ButtonDefaults.filledTonalButtonColors()
-                            ) { Text("Send", fontSize = 11.sp) }
-                        }
-                    }
-                }
-                if (uploadError.isNotEmpty()) {
-                    Text(
-                        uploadError,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.clickable { uploadError = "" }
-                    )
-                }
                 }
             }
-            }
-        }
         }
 
-        if (!isAtBottom) {//need to be higher up to show this
+        if (!isAtBottom) { //need to be higher up to show this
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -884,11 +913,11 @@ private fun SpoilerText(text: String, revealOnTap: Boolean) {
             text = text,
             style = MaterialTheme.typography.bodySmall,
             color = if (revealed) MaterialTheme.colorScheme.onSurface
-                    else          MaterialTheme.colorScheme.onSurface.copy(alpha = 0f)
+            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0f)
         )
         if (!revealed) {
             Text(
-                text = text.map { '█' }.joinToString(""), //epstineify LOL
+                text = text.map { '█' }.joinToString(""),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -953,7 +982,12 @@ private fun MessageOptionsDialog(
                     modifier = Modifier.fillMaxWidth().height(36.dp),
                     colors = ButtonDefaults.filledTonalButtonColors()
                 ) {
-                    Icon(painter = painterResource(id = R.drawable.reply), contentDescription = null,tint = Color.White, modifier = Modifier.size(16.dp))
+                    Icon(
+                        painter = painterResource(id = R.drawable.reply),
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
                     Spacer(Modifier.width(6.dp))
                     Text("Reply")
                 }
@@ -964,7 +998,12 @@ private fun MessageOptionsDialog(
                     modifier = Modifier.fillMaxWidth().height(36.dp),
                     colors = ButtonDefaults.filledTonalButtonColors()
                 ) {
-                    Icon(painter = painterResource(id = R.drawable.emoji), contentDescription = null,tint = Color.White, modifier = Modifier.size(16.dp))
+                    Icon(
+                        painter = painterResource(id = R.drawable.emoji),
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
                     Spacer(Modifier.width(6.dp))
                     Text("React")
                 }
@@ -975,7 +1014,12 @@ private fun MessageOptionsDialog(
                     modifier = Modifier.fillMaxWidth().height(36.dp),
                     colors = ButtonDefaults.filledTonalButtonColors()
                 ) {
-                    Icon(painter = painterResource(id = R.drawable.copy), contentDescription = null,tint = Color.White, modifier = Modifier.size(16.dp))
+                    Icon(
+                        painter = painterResource(id = R.drawable.copy),
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
                     Spacer(Modifier.width(6.dp))
                     Text("Copy Text")
                 }
@@ -987,7 +1031,12 @@ private fun MessageOptionsDialog(
                         modifier = Modifier.fillMaxWidth().height(36.dp),
                         colors = ButtonDefaults.filledTonalButtonColors()
                     ) {
-                        Icon(painter = painterResource(id = R.drawable.edit), contentDescription = null,tint = Color.White, modifier = Modifier.size(16.dp))
+                        Icon(
+                            painter = painterResource(id = R.drawable.edit),
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(Modifier.width(6.dp))
                         Text("Edit")
                     }
@@ -1000,7 +1049,12 @@ private fun MessageOptionsDialog(
                             containerColor = MaterialTheme.colorScheme.error
                         )
                     ) {
-                        Icon(painter = painterResource(id = R.drawable.delete), contentDescription = null,tint = Color.White, modifier = Modifier.size(16.dp))
+                        Icon(
+                            painter = painterResource(id = R.drawable.delete),
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(Modifier.width(6.dp))
                         Text("Delete")
                     }
@@ -1077,11 +1131,11 @@ private fun MessageBubble(
                             var moved = false
                             while (System.currentTimeMillis() < endTime) {
                                 val ev = awaitPointerEvent()
-                                if (ev.changes.all { !it.pressed }) { 
+                                if (ev.changes.all { !it.pressed }) {
                                     lifted = true
-                                    break 
+                                    break
                                 }
-                                // Check if pointer moved more than 10dp — if so, it's a scroll/drag
+                                // Check if pointer moved more than 10dp, if so, it's a scroll/drag
                                 val currentPos = ev.changes.first().position
                                 val distance = (currentPos - startPos).getDistance()
                                 if (distance > 10f * density) {
@@ -1098,10 +1152,10 @@ private fun MessageBubble(
                     }
                 }
             },
-        horizontalArrangement = Arrangement.Start,
+        horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.Top
     ) {
-        if (!compactMode && !isOwn && !isContinuation) {
+        if (!compactMode && !isContinuation) {
             DiscordAvatarWithDecoration(
                 user = msg.author,
                 imageLoader = imageLoader,
@@ -1109,7 +1163,7 @@ private fun MessageBubble(
                 onClick = { onAvatarClick(msg.author.id) }
             )
             Spacer(Modifier.width(4.dp))
-        } else if (!compactMode && !isOwn) {
+        } else if (!compactMode) {
             Spacer(Modifier.width(26.dp))
         }
 
@@ -1133,9 +1187,9 @@ private fun MessageBubble(
                         val todayDate = now.toLocalDate()
                         val yesterdayDate = todayDate.minusDays(1)
                         when (zoned.toLocalDate()) {
-                            todayDate     -> timeStr
+                            todayDate -> timeStr
                             yesterdayDate -> "Yesterday $timeStr"
-                            else          -> "${zoned.monthValue}/${zoned.dayOfMonth} $timeStr"
+                            else -> "${zoned.monthValue}/${zoned.dayOfMonth} $timeStr"
                         }
                     }.getOrElse { "" }
                 }
@@ -1157,6 +1211,7 @@ private fun MessageBubble(
                                     fontSize = 10.sp
                                 )
                             }
+
                             !topRole.iconHash.isNullOrEmpty() -> {
                                 SubcomposeAsyncImage(
                                     model = ImageRequest.Builder(LocalContext.current)
@@ -1295,7 +1350,7 @@ private fun MessageBubble(
             msg.embeds
                 .filter { embed ->
                     !(embed.type == "link" && //lets clean this up a litlle more
-                        embed.url?.contains("cdn.discordapp.com/emojis/") == true)
+                            embed.url?.contains("cdn.discordapp.com/emojis/") == true)
                 }
                 .forEach { embed ->
                     EmbedCard(embed, imageLoader)
@@ -1329,7 +1384,9 @@ private fun MessageContent(
         ContentParser.parse(content, userNames, roleNames, channelNames)
     }
 
-    FlowRow(modifier = Modifier.fillMaxWidth()) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth()
+    ) {
         parts.forEach { part ->
             when (part) {
                 is ContentParser.Part.PlainText -> {
@@ -1341,12 +1398,12 @@ private fun MessageContent(
                             val annotated = buildAnnotatedString {
                                 val style = SpanStyle(
                                     fontWeight = if (span.bold) androidx.compose.ui.text.font.FontWeight.Bold
-                                                 else null,
+                                    else null,
                                     fontStyle = if (span.italic) androidx.compose.ui.text.font.FontStyle.Italic
-                                                 else null,
+                                    else null,
                                     textDecoration = when {
                                         span.strikethrough -> TextDecoration.LineThrough
-                                        else               -> null
+                                        else -> null
                                     },
                                     background = if (span.code)
                                         MaterialTheme.colorScheme.surfaceContainer
@@ -1361,6 +1418,7 @@ private fun MessageContent(
                         }
                     }
                 }
+
                 is ContentParser.Part.CustomEmoji -> {
                     AsyncImage(
                         model = ImageRequest.Builder(context)
@@ -1370,15 +1428,19 @@ private fun MessageContent(
                         modifier = Modifier.size(18.dp)
                     )
                 }
+
                 is ContentParser.Part.UserMention -> {
                     val annotated = buildAnnotatedString {
-                        withStyle(SpanStyle(
-                            color = MaterialTheme.colorScheme.primary,
-                            background = MaterialTheme.colorScheme.primaryContainer
-                        )) { append("@${part.displayName}") }
+                        withStyle(
+                            SpanStyle(
+                                color = MaterialTheme.colorScheme.primary,
+                                background = MaterialTheme.colorScheme.primaryContainer
+                            )
+                        ) { append("@${part.displayName}") }
                     }
                     Text(text = annotated, style = MaterialTheme.typography.bodySmall)
                 }
+
                 is ContentParser.Part.RoleMention -> {
                     val annotated = buildAnnotatedString {
                         withStyle(SpanStyle(color = MaterialTheme.colorScheme.tertiary)) {
@@ -1387,6 +1449,7 @@ private fun MessageContent(
                     }
                     Text(text = annotated, style = MaterialTheme.typography.bodySmall)
                 }
+
                 is ContentParser.Part.ChannelMention -> {
                     val annotated = buildAnnotatedString {
                         withStyle(SpanStyle(color = MaterialTheme.colorScheme.secondary)) {
@@ -1395,12 +1458,15 @@ private fun MessageContent(
                     }
                     Text(text = annotated, style = MaterialTheme.typography.bodySmall)
                 }
+
                 is ContentParser.Part.Link -> {
                     val annotated = buildAnnotatedString {
-                        withStyle(SpanStyle(
-                            color = MaterialTheme.colorScheme.primary,
-                            textDecoration = TextDecoration.Underline
-                        )) { append(part.url) }
+                        withStyle(
+                            SpanStyle(
+                                color = MaterialTheme.colorScheme.primary,
+                                textDecoration = TextDecoration.Underline
+                            )
+                        ) { append(part.url) }
                     }
                     Text(
                         text = annotated,
@@ -1481,8 +1547,10 @@ private fun MediaImage(url: String, contentDesc: String, imageLoader: ImageLoade
 private fun EmbedCard(embed: Embed, imageLoader: ImageLoader) {
     Column(modifier = Modifier.padding(top = 2.dp)) {
         embed.title?.let {
-            Text(it, style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary)
+            Text(
+                it, style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
         }
         embed.description?.let {
             Text(it.take(120), style = MaterialTheme.typography.bodySmall)
@@ -1592,7 +1660,7 @@ private fun AudioAttachment(att: Attachment) {
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Icon(
-                painter= painterResource(id = if (isPlaying) R.drawable.pause else R.drawable.play),
+                painter = painterResource(id = if (isPlaying) R.drawable.pause else R.drawable.play),
                 contentDescription = if (isPlaying) "Pause" else "Play",
                 tint = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
@@ -1636,7 +1704,12 @@ private fun AudioAttachment(att: Attachment) {
 
 
 @Composable
-private fun DiscordAvatarWithDecoration(user: com.zaffox.discordwear.api.DiscordUser, imageLoader: ImageLoader, size: Dp, onClick: () -> Unit = {}) {
+private fun DiscordAvatarWithDecoration(
+    user: com.zaffox.discordwear.api.DiscordUser,
+    imageLoader: ImageLoader,
+    size: Dp,
+    onClick: () -> Unit = {}
+) {
     val decorUrl = user.avatarDecorationUrl()
     Box(
         contentAlignment = Alignment.Center,
@@ -1689,7 +1762,7 @@ private fun DiscordAvatar(url: String?, displayName: String, imageLoader: ImageL
             imageLoader = imageLoader,
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier =Modifier.size(size).clip(CircleShape),
+            modifier = Modifier.size(size).clip(CircleShape),
             error = {
                 Box(
                     modifier = Modifier

@@ -9,8 +9,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.OkHttpClient
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
@@ -27,7 +27,9 @@ class DiscordGateway(private val token: String) {
     private val seq = AtomicInteger(-1)
     private var sessionId: String? = null
     private var resumeUrl: String? = null
-    @Volatile private var connected = false
+
+    @Volatile
+    private var connected = false
 
     private val http = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.MILLISECONDS)
@@ -73,10 +75,12 @@ class DiscordGateway(private val token: String) {
         val d = JSONObject()
             .put("token", token)
             .put("intents", INTENTS)
-            .put("properties", JSONObject()
-                .put("\$os", "Windows")
-                .put("\$browser", "Chrome")
-                .put("\$device", ""))
+            .put(
+                "properties", JSONObject()
+                    .put("\$os", "Windows")
+                    .put("\$browser", "Chrome")
+                    .put("\$device", "")
+            )
         send(Op.IDENTIFY, d)
     }
 
@@ -121,7 +125,9 @@ class DiscordGateway(private val token: String) {
 
                 Op.INVALID_SESSION -> {
                     val resumable = (d as? Boolean) == true
-                    if (!resumable) { sessionId = null; resumeUrl = null }
+                    if (!resumable) {
+                        sessionId = null; resumeUrl = null
+                    }
                     scope.launch { delay(2_000); connect() }
                 }
 
@@ -187,8 +193,32 @@ class DiscordGateway(private val token: String) {
                         runCatching { presences.add(UserPresence.fromJson(presArr.getJSONObject(i))) }
                     }
                 }
-                if (user != null) GatewayEvent.Ready(user, readState, presences) else null
+
+                val readyGuilds = mutableListOf<Guild>()
+                val readyChannels = mutableListOf<Channel>()
+                runCatching {
+                    val gArr = d.optJSONArray("guilds") ?: return@runCatching
+                    for (i in 0 until gArr.length()) {
+                        runCatching {
+                            val g = gArr.getJSONObject(i)
+                            if (g.optBoolean("unavailable", false)) return@runCatching
+                            val guild = Guild.fromJson(g)
+                            readyGuilds.add(guild)
+                            // Embedded channels carry no guild_id; fill it from the parent.
+                            val chArr = g.optJSONArray("channels") ?: return@runCatching
+                            for (j in 0 until chArr.length()) {
+                                runCatching {
+                                    readyChannels.add(
+                                        Channel.fromJson(chArr.getJSONObject(j)).copy(guildId = guild.id)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                if (user != null) GatewayEvent.Ready(user, readState, presences, readyGuilds, readyChannels) else null
             }
+
             "MESSAGE_CREATE" -> runCatching {
                 val msg = DiscordMessage.fromJson(d)
                 val memberObj = d.optJSONObject("member")
@@ -199,15 +229,18 @@ class DiscordGateway(private val token: String) {
                 val guildId = d.optString("guild_id").takeIf { it.isNotEmpty() && it != "null" }
                 GatewayEvent.MessageCreate(msg, roleIds, guildId)
             }.getOrNull()
+
             "MESSAGE_UPDATE" -> runCatching {
                 GatewayEvent.MessageUpdate(DiscordMessage.fromJson(d))
             }.getOrNull()
+
             "MESSAGE_DELETE" -> runCatching {
                 GatewayEvent.MessageDelete(
                     id = d.getString("id"),
                     channelId = d.getString("channel_id")
                 )
             }.getOrNull()
+
             "MESSAGE_REACTION_ADD" -> runCatching {
                 GatewayEvent.ReactionAdd(
                     messageId = d.getString("message_id"),
@@ -216,6 +249,7 @@ class DiscordGateway(private val token: String) {
                     emoji = ReactionEmoji.fromJson(d.getJSONObject("emoji"))
                 )
             }.getOrNull()
+
             "MESSAGE_REACTION_REMOVE" -> runCatching {
                 GatewayEvent.ReactionRemove(
                     messageId = d.getString("message_id"),
@@ -224,6 +258,7 @@ class DiscordGateway(private val token: String) {
                     emoji = ReactionEmoji.fromJson(d.getJSONObject("emoji"))
                 )
             }.getOrNull()
+
             "TYPING_START" -> runCatching {
                 fun String.realOrNull() = takeIf { it.isNotEmpty() && it != "null" }
                 val memberObj = d.optJSONObject("member")
@@ -238,9 +273,11 @@ class DiscordGateway(private val token: String) {
                     displayName = displayName
                 )
             }.getOrNull()
+
             "PRESENCE_UPDATE" -> runCatching {
                 GatewayEvent.PresenceUpdate(UserPresence.fromJson(d))
             }.getOrNull()
+
             else -> GatewayEvent.Unknown(eventName)
         }
 
@@ -256,12 +293,32 @@ class DiscordGateway(private val token: String) {
 }
 
 sealed class GatewayEvent {
-    data class Ready(val user: DiscordUser, val readState: Map<String, ChannelUnreadState> = emptyMap(), val presences: List<UserPresence> = emptyList()) : GatewayEvent()
-    data class MessageCreate(val message: DiscordMessage, val memberRoleIds: List<String> = emptyList(), val guildId: String? = null) : GatewayEvent()
+    data class Ready(
+        val user: DiscordUser,
+        val readState: Map<String, ChannelUnreadState> = emptyMap(),
+        val presences: List<UserPresence> = emptyList(),
+        val guilds: List<Guild> = emptyList(),
+        val channels: List<Channel> = emptyList()
+    ) : GatewayEvent()
+
+    data class MessageCreate(
+        val message: DiscordMessage,
+        val memberRoleIds: List<String> = emptyList(),
+        val guildId: String? = null
+    ) : GatewayEvent()
+
     data class MessageUpdate(val message: DiscordMessage) : GatewayEvent()
     data class MessageDelete(val id: String, val channelId: String) : GatewayEvent()
-    data class ReactionAdd(val messageId: String, val channelId: String, val userId: String, val emoji: ReactionEmoji) : GatewayEvent()
-    data class ReactionRemove(val messageId: String, val channelId: String, val userId: String, val emoji: ReactionEmoji) : GatewayEvent()
+    data class ReactionAdd(val messageId: String, val channelId: String, val userId: String, val emoji: ReactionEmoji) :
+        GatewayEvent()
+
+    data class ReactionRemove(
+        val messageId: String,
+        val channelId: String,
+        val userId: String,
+        val emoji: ReactionEmoji
+    ) : GatewayEvent()
+
     data class TypingStart(val channelId: String, val userId: String, val displayName: String? = null) : GatewayEvent()
     data class PresenceUpdate(val presence: UserPresence) : GatewayEvent()
     data class Unknown(val name: String) : GatewayEvent()

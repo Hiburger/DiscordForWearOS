@@ -3,16 +3,15 @@ package com.zaffox.discordwear.api
 import android.util.Base64
 import org.json.JSONObject
 
-/**
- * Fingerprint constants shared by all Discord HTTP/WebSocket traffic so the
- * app looks like the official web client (see upstream issue: "Why not use API v9").
- */
+
+// Fingerprint constants shared by all Discord HTTP/WebSocket traffic so the app looks like the official web client ;)
+
 object DiscordHttp {
     // The stable client-facing REST version used by the official web client
     const val REST_BASE_URL = "https://discord.com/api/v9"
 
     const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-        "(KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36"
+            "(KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36"
 
     // The web client connects its gateway with v10
     const val GATEWAY_URL = "wss://gateway.discord.gg/?v=10&encoding=json"
