@@ -33,7 +33,7 @@ class DiscordRestClient(private val token: String) {
             .header("X-Super-Properties", DiscordHttp.superProperties)
             .header("X-Discord-Locale", "en-US")
             .header("X-Discord-Timezone", ZoneId.systemDefault().id)
-            .header("Sec-Ch-Ua", '"Not=A?Brand";v="99", "Google Chrome";v="151", "Chromium";v="151"')
+            .header("Sec-Ch-Ua", "\"Not=A?Brand\";v=\"99\", \"Google Chrome\";v=\"151\", \"Chromium\";v=\"151\"")
             .header("Sec-Ch-Ua-Mobile", "?0")
             .header("Sec-Ch-Ua-Platform", "Windows")
             .header("Origin", "https://discord.com")
