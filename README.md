@@ -29,7 +29,7 @@ All of this from your wrist !
 ### If you are doing a fresh install
 
 1. Grab the latest `DiscordWear.apk` from the [Releases](https://github.com/Hiburger/DiscordForWearOS/releases) page
-2. Transfer it to your watch, either with `adb install DiscordWear.apk` (ADB wireless debugging must be on. [How to turn this on]([URL](https://chk.me/5zu63Fh)) ), or with a tool like *Wear Installer*
+2. Transfer it to your watch, either with `adb install DiscordWear.apk` (ADB wireless debugging must be on. [How to turn this on](https://chk.me/5zu63Fh) ), or with a tool like *Wear Installer*
 3. If installing directly on the watch, allow installs from unknown sources when prompted
 
 ### Things you should know !
