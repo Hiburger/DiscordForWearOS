@@ -28,8 +28,8 @@ All of this from your wrist !
 
 ### If you are doing a fresh install
 
-1. Grab the latest `app-release.apk` from the [Releases](https://github.com/Hiburger/DiscordForWearOS/releases) page
-2. Transfer it to your watch, either with `adb install app-release.apk` (enable ADB debugging in watch Developer options), or with a tool like *Wear Installer*
+1. Grab the latest `DiscordWear.apk` from the [Releases](https://github.com/Hiburger/DiscordForWearOS/releases) page
+2. Transfer it to your watch, either with `adb install DiscordWear.apk` (ADB wireless debugging must be on. [How to turn this on]([URL](https://chk.me/5zu63Fh)) ), or with a tool like *Wear Installer*
 3. If installing directly on the watch, allow installs from unknown sources when prompted
 
 ### Things you should know !
@@ -49,11 +49,12 @@ The app logs in via Discord's device-linking flow:
 
 The app also offers two fallbacks: pasting your token directly on the watch, or letting the watch run a tiny local web server (same Wi-Fi network) where you can submit the token from a phone/PC browser.
 
-Your token is stored locally on the watch only fyi
+Your token is stored locally and exclusively on the watch
 
 ## Because our world isn’t all sunshine and rainbows
 
-This is **not an official Discord client**. It uses Discord's private user API, which is against Discord's Terms of Service and may result in your account being **suspended or banned**. Use at your own risk.
+As you already know, this is **not an official Discord client**. It uses Discord's private user API, which is against Discord's Terms of Service and may result in your account being **suspended or banned**. 
+Use at your own risk.
 
 ## Building from source
 
