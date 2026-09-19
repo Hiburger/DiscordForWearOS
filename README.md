@@ -29,8 +29,31 @@ All of this from your wrist !
 ### If you are doing a fresh install
 
 1. Grab the latest `DiscordWear.apk` from the [Releases](https://github.com/Hiburger/DiscordForWearOS/releases) page
-2. Transfer it to your watch, either with `adb install DiscordWear.apk` (ADB wireless debugging must be on. [How to turn this on](https://chk.me/5zu63Fh) ), or with a tool like *Wear Installer*
+2. Transfer it to your watch with `adb` (step by step below), or with a tool like *Wear Installer*
 3. If installing directly on the watch, allow installs from unknown sources when prompted
+
+### Install with adb, step by step
+
+You need the [Android platform-tools](https://developer.android.com/tools/releases/platform-tools) (`adb`) on your computer, and your **watch and computer on the same Wi-Fi**.
+
+1. On the watch: Settings → System → About → tap **Build number** 7 times (this unlocks Developer options)
+2. Settings → Developer options → turn on **ADB debugging**, then **Wireless debugging**
+3. Put the watch on its **charger** and keep the screen on (Wi-Fi dozes otherwise and the connection dies)
+4. Tap **Pair new device**, then on your computer run (numbers come from the watch screen):
+   ```bash
+   adb pair <watch-ip>:<pair-port> <6-digit-code>
+   ```
+5. Go back, tap the **Wireless debugging row itself** for the details screen, and connect using the **IP address & Port** shown there (⚠️ this is a *different* port than pairing — connecting to the pairing port fails):
+   ```bash
+   adb connect <watch-ip>:<port>
+   adb devices   # your watch should show up as "device"
+   ```
+6. Install ( `-r` keeps your data on updates):
+   ```bash
+   adb install -r DiscordWear.apk
+   ```
+
+Ports and codes expire after a couple of minutes — if a step fails, just generate fresh ones and retry quickly. If `adb install` complains about signatures (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`), uninstall first (`adb uninstall com.zaffox.discordwear`), knowing you will have to log in again.
 
 ### Things you should know !
 
