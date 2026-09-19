@@ -24,7 +24,7 @@ This is a maintained fork of [Zaffox/Discord-WearOS](https://github.com/Zaffox/D
 
 All of this from your wrist !
 
-## Easy install
+## Installation 
 
 ### If you are doing a fresh install
 
@@ -32,7 +32,7 @@ All of this from your wrist !
 2. Transfer it to your watch with `adb` (step by step below), or with a tool like *Wear Installer*
 3. If installing directly on the watch, allow installs from unknown sources when prompted
 
-### Install with adb, step by step
+### After you got your .apk from [Releases](https://github.com/Hiburger/DiscordForWearOS/releases) 
 
 You need the [Android platform-tools](https://developer.android.com/tools/releases/platform-tools) (`adb`) on your computer, and your **watch and computer on the same Wi-Fi**.
 
@@ -43,17 +43,17 @@ You need the [Android platform-tools](https://developer.android.com/tools/releas
    ```bash
    adb pair <watch-ip>:<pair-port> <6-digit-code>
    ```
-5. Go back, tap the **Wireless debugging row itself** for the details screen, and connect using the **IP address & Port** shown there (⚠️ this is a *different* port than pairing — connecting to the pairing port fails):
+5. Go back, tap the **Wireless debugging row itself** for the details screen, and connect using the **IP address & Port** shown there (This is a *different* port than pairing! Using the wront port won't work):
    ```bash
    adb connect <watch-ip>:<port>
-   adb devices   # your watch should show up as "device"
+   adb devices   # your watch should show up
    ```
-6. Install ( `-r` keeps your data on updates):
+6. Install ( `-r` keeps your data on updates, the path to apk could also be different):
    ```bash
-   adb install -r DiscordWear.apk
+   adb install -r /Downloads/DiscordWear.apk
    ```
 
-Ports and codes expire after a couple of minutes — if a step fails, just generate fresh ones and retry quickly. If `adb install` complains about signatures (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`), uninstall first (`adb uninstall com.zaffox.discordwear`), knowing you will have to log in again.
+Ports and codes expire after a couple of minutes... if a step fails, just generate fresh ones and retry quickly. If `adb install` complains about signatures (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`), uninstall first (`adb uninstall com.zaffox.discordwear`), knowing you will have to log in again
 
 ### Things you should know !
 
