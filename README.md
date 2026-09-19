@@ -8,6 +8,8 @@ Hi ! This is an unofficial, open-source Discord client for your Wear OS watch bu
 
 This is a maintained fork of [Zaffox/Discord-WearOS](https://github.com/Zaffox/Discord-WearOS) on GitHub, kept alive after the original project went inactive. The assets, screenshots, and most of the code are from that repo.
 
+For this specific reason, I'm working on V2. Which will have a different package name, a different app icon, a different name and different screenshots. Speaking of screenshots...
+
 | Home | Servers | Mentions |
 |:---:|:---:|:---:|
 | ![Home](Images/1.png) | ![Servers](Images/2.png) | ![Mentions](Images/4.png) |
