@@ -55,6 +55,16 @@ You need the [Android platform-tools](https://developer.android.com/tools/releas
 
 Ports and codes expire after a couple of minutes... if a step fails, just generate fresh ones and retry quickly. If `adb install` complains about signatures (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`), uninstall first (`adb uninstall com.zaffox.discordwear`), knowing you will have to log in again
 
+#### adb not cooperating ? Check this first
+
+- **Turn off your VPN** (on the computer *AND* the watch). VPNs reroute traffic and silently break computer <-> watch connections, this alone can waste an evening (I know what i'm talking about).
+- **Same network, really.** No guest Wi-Fi, no phone hotspot mix-ups. But wired computer + wireless watch is fine as long as the router bridges them.
+- **Keep the screen awake the whole time.** Screen off = Wi-Fi likely killed = dead connection and expired numbers.
+- **Pair port ≠ connect port.** Pairing port + code come together from *Pair new device*; the connect port lives alone on the details screen (tap the row text). Mixing them fails every time.
+- **Already paired once ?** You never need a code again: just the current connect port.
+- **Still stuck ?** Use *Wear Installer* from your phone instead, and remember: after the first install, updates arrive on-watch by themselves via Settings > Check for updates. 
+- **adb is a one-time thing (thank you google)**
+
 ### Things you should know !
 
 > [!IMPORTANT]
