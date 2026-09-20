@@ -72,7 +72,7 @@ Ports and codes expire after a couple of minutes... if a step fails, just genera
 >
 > This fork is signed with a different key, so installing over the original fails (with the following unclear error: "App not installed"). You will need to log in again after installing.
 > 
-> Allowing notifications lets the app run in the background almost all the time. This may drain your battery. If you prioritize battery life, consider disabling notification permissions.
+> Allowing notifications lets the app run in the background almost all the time. This may use more battery. If you prioritize battery life, consider disabling notification permissions.
 > 
 > This is a 3rd party client, and the discord people don't like that. Using this app goes against their ToS and could lead to a ban (even if the risk is pretty low). I am not responsible for it if your account gets banned.
 
