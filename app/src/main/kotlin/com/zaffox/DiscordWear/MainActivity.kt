@@ -26,7 +26,11 @@ class MainActivity : ComponentActivity() {
 
     private val notifPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { }
+    ) { granted ->
+        if (granted && SetupPreferences.getToken(this) != null) {
+            NotificationService.start(this)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
