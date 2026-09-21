@@ -26,6 +26,10 @@
         android:theme="@android:style/Theme.DeviceDefault"
         android:supportsRtl="true">
 
+        <meta-data
+            android:name="com.google.android.wearable.standalone"
+            android:value="true" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
