@@ -57,8 +57,8 @@ The most useful bug report for a Wear OS app contains:
 
 1. Watch model + Wear OS version (Usually in Settings > System > About)
 2. App version (Settings > About in the app)
-3. What you did, what you expected, what happened
-( 4. If it's a crash: `adb logcat` output from right after it happens. This is an annoying step, i'm not forcing you to do it but it helps me)
+3. What you did, what you expected, what happened  
+4. (If it's a crash: `adb logcat` output from right after it happens. This is an annoying step, i'm not forcing you to do it but it helps me)
 
 ```bash
 adb logcat -d > log.txt
