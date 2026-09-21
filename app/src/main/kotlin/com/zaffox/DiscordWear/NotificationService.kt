@@ -159,10 +159,14 @@ class NotificationService : Service() {
 
         fun start(context: android.content.Context) {
             val intent = Intent(context, NotificationService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
+            if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+                // permissions not allowed, don't do anything
             } else {
-                context.startService(intent)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
             }
         }
 
