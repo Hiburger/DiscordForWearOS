@@ -57,7 +57,7 @@ private class PersistedStringMap(private val prefs: SharedPreferences?, private 
     }
 }
 
-class DiscordRepository(token: String, private val context: Context? = null) {
+class DiscordRepository(token: String, private val context: Context? = null, val mock: Boolean = false) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val rest = DiscordRestClient(token)
     private val gateway = DiscordGateway(token)
@@ -190,6 +190,10 @@ class DiscordRepository(token: String, private val context: Context? = null) {
         }
 
     fun connect() {
+        if (mock) {
+            seedMockData()
+            return
+        }
         gateway.connect()
         observeGatewayEvents()
         scope.launch { refreshCurrentUser() }
@@ -198,7 +202,7 @@ class DiscordRepository(token: String, private val context: Context? = null) {
         scope.launch {
             val cachedGuildIds = loadCachedGuilds().map { it.id }
             for (guildId in cachedGuildIds) {
-                val groups = getCachedChannels(guildId, filterInaccessible = false) ?: continue
+                val groups = getCachedChannels(guildId) ?: continue
                 groups.forEach { group ->
                     group.channels.forEach { ch ->
                         channelNameCache[ch.id] = ch.name
@@ -289,7 +293,7 @@ class DiscordRepository(token: String, private val context: Context? = null) {
         return emptyList()
     }
 
-    fun getCachedChannels(guildId: String, filterInaccessible: Boolean): List<CategoryGroup>? = runCatching {
+    fun getCachedChannels(guildId: String): List<CategoryGroup>? = runCatching {
         val json = prefs?.getString("channels_v2_$guildId", null) ?: return null
         val arr = JSONArray(json)
         val allChannels = Channel.listFromJson(arr)
@@ -306,11 +310,11 @@ class DiscordRepository(token: String, private val context: Context? = null) {
         val byParent = textChannels.groupBy { it.parentId }
         val groups = mutableListOf<CategoryGroup>()
         val topLevel = byParent[null].orEmpty()
-            .filter { !filterInaccessible || it.hasAccess }.sortedBy { it.position }
+            .filter { it.hasAccess }.sortedBy { it.position }
         if (topLevel.isNotEmpty()) groups.add(CategoryGroup(null, topLevel))
         for (cat in categories) {
             val children = byParent[cat.id].orEmpty()
-                .filter { !filterInaccessible || it.hasAccess }.sortedBy { it.position }
+                .filter { it.hasAccess }.sortedBy { it.position }
             if (children.isNotEmpty()) groups.add(CategoryGroup(cat, children))
         }
         groups.ifEmpty { null }
@@ -329,10 +333,27 @@ class DiscordRepository(token: String, private val context: Context? = null) {
         _readState.update { current ->
             current + (channelId to ChannelUnreadState(lastMessageId = messageId, mentionCount = 0))
         }
+        applyLocalRead(channelId)
         scope.launch { rest.ackChannel(channelId, messageId) }
     }
 
+    // Keep home badges/cards in sync after the unread state changes:
+    // recompute total mentions and drop mention cards for the read channel
+    private fun applyLocalRead(channelId: String) {
+        _totalMentions.value = _readState.value.values.sumOf { it.mentionCount }
+        _pings.update { pings -> pings.filter { it.message.channelId != channelId } }
+    }
+
     suspend fun loadMessages(channelId: String) {
+        if (mock) {
+            // Simulate reading: clear the channel's unread state locally
+            _readState.update { current ->
+                current[channelId]?.let { current + (channelId to it.copy(mentionCount = 0)) } ?: current
+            }
+            applyLocalRead(channelId)
+            loadedChannels.add(channelId)
+            return
+        }
         // Fetch channel metadata if not cached
         if (!channelCache.containsKey(channelId)) {
             rest.getChannel(channelId).onSuccess { ch ->
@@ -691,6 +712,116 @@ class DiscordRepository(token: String, private val context: Context? = null) {
                 }
             }
         }
+    }
+
+    // Debug-only: fills the state with fake data so the app can be exercised
+    // without logging in. Enabled via `adb shell am start ... --ez mock true`.
+    private fun seedMockData() {
+        val me = DiscordUser(id = "1001", username = "watchtester", discriminator = "0001", globalName = "Watch Tester", avatarHash = null)
+        val alice = DiscordUser(id = "2001", username = "alice", discriminator = "0002", globalName = "Alice", avatarHash = null)
+        val bob = DiscordUser(id = "2002", username = "bob", discriminator = "0003", globalName = "Bob", avatarHash = null)
+        val carol = DiscordUser(id = "2003", username = "carol", discriminator = "0004", globalName = "Carol", avatarHash = null)
+
+        _currentUser.value = me
+        currentUserId = me.id
+        userDisplayNames[me.id] = me.displayName
+        userDisplayNames[alice.id] = alice.displayName
+        userDisplayNames[bob.id] = bob.displayName
+        userDisplayNames[carol.id] = carol.displayName
+
+        _guilds.value = listOf(
+            Guild("9001", "Wear OS Dev", null),
+            Guild("9002", "Gaming Lounge", null),
+            Guild("9003", "Discord Testers", null)
+        )
+
+        val dmAlice = Channel("3001", ChannelType.DM, null, "", null, "6009", null, 0, recipients = listOf(alice))
+        val dmBob = Channel("3002", ChannelType.DM, null, "", null, "6003", null, 0, recipients = listOf(bob))
+        val dmCarol = Channel("3003", ChannelType.DM, null, "", null, "6008", null, 0, recipients = listOf(carol))
+        _dmChannels.value = listOf(dmAlice, dmBob, dmCarol)
+
+        val general = Channel("4001", ChannelType.GUILD_TEXT, "9001", "general", "Watch talk", "6010", null, 0)
+        val development = Channel("4002", ChannelType.GUILD_TEXT, "9001", "development", "Build logs", "6007", null, 1)
+        val bugReports = Channel("4005", ChannelType.GUILD_TEXT, "9001", "bug-reports", null, "6011", null, 2)
+        val help = Channel("4006", ChannelType.GUILD_TEXT, "9001", "help", null, "6012", null, 3)
+        val lounge = Channel("4003", ChannelType.GUILD_TEXT, "9002", "lounge", null, "6004", null, 0)
+        val memes = Channel("4004", ChannelType.GUILD_TEXT, "9002", "memes", null, "6005", null, 1)
+
+        val all = listOf(general, development, bugReports, help, lounge, memes)
+
+        val t = { m: Int -> "2026-09-21T09:0$m:00.000+00:00" }
+        fun msg(id: String, ch: String, author: DiscordUser, content: String, mentionMe: Boolean = false, everyone: Boolean = false) =
+            DiscordMessage(
+                id = id, channelId = ch, author = author, content = content, timestamp = t(1),
+                editedTimestamp = null,
+                mentionedUsers = if (mentionMe) listOf(me) else emptyList(),
+                mentionedUserIds = if (mentionMe) listOf(me.id) else emptyList(),
+                mentionEveryone = everyone,
+                guildId = all.firstOrNull { it.id == ch }?.guildId
+            )
+
+        _messages.value = mapOf(
+            "3001" to listOf(
+                msg("6001", "3001", alice, "Hey! how is the watch beta going?"),
+                msg("6002", "3001", me, "just shipped the battery fix"),
+                msg("6009", "3001", alice, "<@1001> can you check the update notification?", mentionMe = true)
+            ),
+            "3002" to listOf(msg("6003", "3002", bob, "gg on the release")),
+            "3003" to listOf(msg("6008", "3003", carol, "typing test")),
+            "4001" to listOf(
+                msg("6005", "4001", bob, "morning all"),
+                msg("6006", "4001", carol, "who broke the build?"),
+                msg("6007", "4001", alice, "not me"),
+                msg("6010", "4001", bob, "@everyone release time!", everyone = true)
+            ),
+            "4002" to listOf(msg("6004", "4002", me, "pushed the notification changes")),
+            "4005" to listOf(msg("6011", "4005", carol, "<@1001> the list overflow is fixed", mentionMe = true)),
+            "4006" to listOf(msg("6012", "4006", alice, "<@1001> welcome to the help channel", mentionMe = true)),
+            "4004" to listOf(msg("6013", "4004", bob, "<@1001> meme of the day", mentionMe = true))
+        )
+
+        _presences.value = mapOf(
+            "2001" to UserPresence("2001", OnlineStatus.ONLINE),
+            "2002" to UserPresence("2002", OnlineStatus.DND),
+            "2003" to UserPresence("2003", OnlineStatus.OFFLINE)
+        )
+
+        _readState.value = mapOf(
+            "4001" to ChannelUnreadState("6010", mentionCount = 1),
+            "3001" to ChannelUnreadState("6009", mentionCount = 1),
+            "4005" to ChannelUnreadState("6011", mentionCount = 3),
+            "4006" to ChannelUnreadState("6012", mentionCount = 2),
+            "4004" to ChannelUnreadState("6013", mentionCount = 1)
+        )
+        _totalMentions.value = 8
+
+        _pings.value = listOf(
+            Ping(msg("6010", "4001", bob, "@everyone release time!", everyone = true), "general", "Wear OS Dev")
+        )
+
+        all.forEach { ch ->
+            channelCache[ch.id] = ch
+            channelNameCache[ch.id] = ch.displayName
+        }
+        _dmChannels.value.forEach { ch ->
+            channelNameCache[ch.id] = ch.displayName
+            channelCache[ch.id] = ch
+        }
+        channelGuildCache["4001"] = "9001"
+        channelGuildCache["4002"] = "9001"
+        channelGuildCache["4005"] = "9001"
+        channelGuildCache["4006"] = "9001"
+        channelGuildCache["4003"] = "9002"
+        channelGuildCache["4004"] = "9002"
+        loadedChannels.addAll(all.map { it.id })
+        loadedChannels.addAll(listOf("3001", "3002", "3003"))
+
+        // Cache guild channels so ServerChannelsScreen shows them offline
+        val groups = listOf(
+            CategoryGroup(null, listOf(general, development, bugReports, help))
+        )
+        saveChannels("9001", groups)
+        saveChannels("9002", listOf(CategoryGroup(null, listOf(lounge, memes))))
     }
 
     private fun loadCachedGuilds(): List<Guild> = runCatching {

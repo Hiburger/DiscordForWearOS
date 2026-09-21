@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -123,7 +124,7 @@ fun QrLoginScreen(onSetupComplete: () -> Unit, onBack: () -> Unit) {
                             status.lines[i],
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Start,
+                            textAlign = TextAlign.Center,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 8.dp, vertical = 1.dp)
@@ -132,9 +133,15 @@ fun QrLoginScreen(onSetupComplete: () -> Unit, onBack: () -> Unit) {
                     item {
                         Button(
                             onClick = { client?.disconnect(); onBack() },
-                            modifier = Modifier.fillMaxWidth(0.7f).height(32.dp),
+                            modifier = Modifier.height(32.dp),
                             colors = ButtonDefaults.filledTonalButtonColors()
-                        ) { Text("Cancel") }
+                        ) {
+                            Text(
+                                "Cancel",
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                 }
 
@@ -151,13 +158,14 @@ fun QrLoginScreen(onSetupComplete: () -> Unit, onBack: () -> Unit) {
                             content = "https://discord.com/ra/${s.fingerprint}",
                             modifier = Modifier
                                 .size(130.dp)
+                                .clip(RoundedCornerShape(14.dp))
                                 .background(Color.White)
                                 .padding(4.dp)
                         )
                     }
                     item {
                         Text(
-                            "Profile → Scan QR Code in the Discord app",
+                            "On the mobile app, open settings, 'then Scan QR Code'",
                             style = MaterialTheme.typography.labelSmall,
                             textAlign = TextAlign.Center,
                             modifier = Modifier
@@ -167,7 +175,7 @@ fun QrLoginScreen(onSetupComplete: () -> Unit, onBack: () -> Unit) {
                     }
                     item {
                         Text(
-                            "Scan quickly; this code expires!",
+                            "Scan quickly; this QR expires!",
                             style = MaterialTheme.typography.labelSmall,
                             textAlign = TextAlign.Center,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -179,9 +187,15 @@ fun QrLoginScreen(onSetupComplete: () -> Unit, onBack: () -> Unit) {
                     item {
                         Button(
                             onClick = { client?.disconnect(); onBack() },
-                            modifier = Modifier.fillMaxWidth(0.7f).height(32.dp),
+                            modifier = Modifier.height(32.dp),
                             colors = ButtonDefaults.filledTonalButtonColors()
-                        ) { Text("Cancel") }
+                        ) {
+                            Text(
+                                "Cancel",
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                 }
 
@@ -244,7 +258,7 @@ fun QrLoginScreen(onSetupComplete: () -> Unit, onBack: () -> Unit) {
                     }
                     item {
                         Text(
-                            "Login was canceled on your phone.",
+                            "Login was canceled on your phone",
                             style = MaterialTheme.typography.bodySmall,
                             textAlign = TextAlign.Center
                         )
@@ -267,7 +281,7 @@ fun QrLoginScreen(onSetupComplete: () -> Unit, onBack: () -> Unit) {
                     }
                     item {
                         Text(
-                            "Discord asked for a human check (hCaptcha). QR can't finish on the watch alone.",
+                            "Discord asked for a Captcha; QR alone can't log you in!",
                             style = MaterialTheme.typography.bodySmall,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(horizontal = 8.dp)
@@ -408,7 +422,7 @@ fun QrLoginScreen(onSetupComplete: () -> Unit, onBack: () -> Unit) {
                     }
                     item {
                         Text(
-                            "Tip: QR is often blocked by Discord. Token login almost always works.",
+                            "Tip: if QR is blocked by Discord, log in with account token.",
                             style = MaterialTheme.typography.labelSmall,
                             textAlign = TextAlign.Center,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -452,7 +466,7 @@ private fun QrCodeImage(content: String, modifier: Modifier = Modifier) {
         Image(
             bitmap = bitmap.asImageBitmap(),
             contentDescription = "QR Code",
-            modifier = modifier,
+            modifier = modifier.clip(RoundedCornerShape(14.dp)),
             contentScale = ContentScale.Fit
         )
     }

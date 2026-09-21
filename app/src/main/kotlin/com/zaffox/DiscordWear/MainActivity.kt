@@ -39,8 +39,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        if (intent?.hasExtra(EXTRA_MOCK) == true && BuildConfig.DEBUG) {
+            SetupPreferences.setMockMode(this, intent.getBooleanExtra(EXTRA_MOCK, false))
+        }
+        val mock = BuildConfig.DEBUG && SetupPreferences.isMockMode(this)
         val token = SetupPreferences.getToken(this)
-        if (token != null) discordApp.initRepository(token)
+        when {
+            mock -> discordApp.initMockRepository()
+            token != null -> discordApp.initRepository(token)
+        }
 
         consumeIntentExtras(intent)
         requestNotificationPermissionIfNeeded()
@@ -51,7 +58,7 @@ class MainActivity : ComponentActivity() {
                     val navController = rememberSwipeDismissableNavController()
                     SwipeDismissableNavHost(
                         navController = navController,
-                        startDestination = if (token != null) "home" else "Welcome"
+                        startDestination = if (token != null || mock) "home" else "Welcome"
                     ) {
 
                         composable("home") {
@@ -62,11 +69,19 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToServers = { navController.navigate("servers") },
                                 onNavigateToWelcome = { navController.navigate("Welcome") },
                                 onNavigateToSettings = { navController.navigate("settings") },
+                                onNavigateToMentions = { navController.navigate("mentions") },
                                 onNavigateToChat = { chId, chName, guildId ->
                                     val guildSeg = guildId ?: "dm"
                                     navController.navigate("chatscreen/$chId/$chName/$guildSeg")
                                 }
                             )
+                        }
+
+                        composable("mentions") {
+                            MentionsScreen(onNavigateToChat = { chId, chName, guildId ->
+                                val guildSeg = guildId ?: "dm"
+                                navController.navigate("chatscreen/$chId/$chName/$guildSeg")
+                            })
                         }
 
                         composable("Welcome") {
@@ -233,5 +248,6 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_CHANNEL_NAME = "extra_channel_name"
         const val EXTRA_GUILD_ID = "extra_guild_id"
         const val EXTRA_OPEN_SETTINGS = "extra_open_settings"
+        const val EXTRA_MOCK = "extra_mock"
     }
 }

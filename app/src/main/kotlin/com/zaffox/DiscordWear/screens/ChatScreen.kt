@@ -334,6 +334,7 @@ fun ChatScreen(
                         value = editText,
                         onValueChange = { editText = it },
                         modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
                         label = { Text("Edit", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                         textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
                         colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
@@ -705,6 +706,7 @@ fun ChatScreen(
                                     pendingText = newValue
                                 },
                                 modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
                                 placeholder = {
                                     Text(
                                         "Message #$channelName",

@@ -62,7 +62,6 @@ fun ServerChannels(
     val repo = context.discordApp.repository
     val listState = rememberScalingLazyListState()
     val scope = rememberCoroutineScope()
-    val hideInaccessible = remember { SetupPreferences.getHideInaccessibleChannels(context) }
     val showMentionBadges = remember { SetupPreferences.getShowMentionBadges(context) }
     val readState by (repo?.readState ?: return).collectAsState()
 
@@ -73,7 +72,7 @@ fun ServerChannels(
     LaunchedEffect(guildId) {
         scope.launch(Dispatchers.IO) {
             // Check for cached channels first
-            val cached = repo?.getCachedChannels(guildId, filterInaccessible = hideInaccessible)
+            val cached = repo?.getCachedChannels(guildId)
 
             if (!cached.isNullOrEmpty()) {
                 groups = cached
@@ -83,7 +82,7 @@ fun ServerChannels(
             }
 
             // No cache or cache is empty -> fetch from network
-            repo?.rest?.getGuildChannels(guildId, filterInaccessible = hideInaccessible)
+            repo?.rest?.getGuildChannels(guildId)
                 ?.onSuccess {
                     groups = it
                     loading = false
@@ -163,7 +162,7 @@ fun ServerChannels(
 
                         items(group.channels.size) { idx ->
                             val ch = group.channels[idx]
-                            if (hideInaccessible && !ch.hasAccess) return@items
+                            if (!ch.hasAccess) return@items
                             val rs = if (showMentionBadges) readState[ch.id] else null
                             val mentionCount = rs?.mentionCount ?: 0
                             val hasUnread = rs != null && ch.lastMessageId != null &&

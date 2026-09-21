@@ -22,18 +22,15 @@ fun SettingsScreen(
     scrollToUpdate: Boolean = false,
     onUpdateShown: () -> Unit = {}
 ) {
-    val context   = LocalContext.current
+    val context = LocalContext.current
     val listState = rememberScalingLazyListState()
-    val scope     = rememberCoroutineScope()
-    val repo      = context.discordApp.repository
-    var downloading    by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val repo = context.discordApp.repository
+    var downloading by remember { mutableStateOf(false) }
     var downloadProgress by remember { mutableStateOf(0f) }
-    var downloadError  by remember { mutableStateOf("") }
+    var downloadError by remember { mutableStateOf("") }
 
 
-    var hideInaccessible by remember {
-        mutableStateOf(SetupPreferences.getHideInaccessibleChannels(context))
-    }
     var sendAnimatedAsGif by remember {
         mutableStateOf(SetupPreferences.getSendAnimatedAsGif(context))
     }
@@ -65,22 +62,22 @@ fun SettingsScreen(
                 item {
                     Text(
                         "Log out?",
-                        style     = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleMedium,
                         textAlign = TextAlign.Center,
-                        modifier  = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
                 item {
                     Text(
                         "Your token will be cleared from this device.",
-                        style     = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodySmall,
                         textAlign = TextAlign.Center,
-                        modifier  = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
                     )
                 }
                 item {
                     Button(
-                        onClick  = {
+                        onClick = {
                             scope.launch {
                                 runCatching { repo?.rest?.logout() }
                                 repo?.disconnect()
@@ -89,17 +86,17 @@ fun SettingsScreen(
                                 onLogOut()
                             }
                         },
-                        modifier = Modifier.fillMaxWidth().height(36.dp),
-                        colors   = ButtonDefaults.buttonColors(
+                        modifier = Modifier.height(36.dp),
+                        colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.error
                         )
                     ) { Text("Log Out") }
                 }
                 item {
                     Button(
-                        onClick  = { showLogoutConfirm = false },
-                        modifier = Modifier.fillMaxWidth().height(36.dp),
-                        colors   = ButtonDefaults.filledTonalButtonColors()
+                        onClick = { showLogoutConfirm = false },
+                        modifier = Modifier.height(36.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors()
                     ) { Text("Cancel") }
                 }
             }
@@ -122,116 +119,62 @@ fun SettingsScreen(
             item {
                 Text(
                     "Settings",
-                    style     = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center,
-                    modifier  = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
 
             item {
                 Text(
                     "GENERAL",
-                    style  = MaterialTheme.typography.labelSmall,
-                    color  = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp)
                 )
             }
 
             item {
                 SwitchButton(
-                    modifier = Modifier.fillMaxWidth().height(40.dp),
-                    checked  = showMentionBadges,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    checked = showMentionBadges,
                     onCheckedChange = {
                         showMentionBadges = it
                         SetupPreferences.setShowMentionBadges(context, it)
                     },
-                    label    = { Text("Show mention badges", style = MaterialTheme.typography.bodySmall) }
+                    label = { Text("Show mention badges", style = MaterialTheme.typography.bodySmall) }
                 )
             }
 
             item {
                 SwitchButton(
                     modifier = Modifier.fillMaxWidth().height(48.dp),
-                    checked  = spoilerRevealOnTap,
+                    checked = spoilerRevealOnTap,
                     onCheckedChange = {
                         spoilerRevealOnTap = it
                         SetupPreferences.setSpoilerRevealOnTap(context, it)
                     },
-                    label    = {
-                        Column {
-                            Text("Spoiler reveal on tap", style = MaterialTheme.typography.bodySmall)
-                            Text(
-                                "||spoiler|| text hidden until tapped",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                    label = { Text("Reveal spoilers on tap", style = MaterialTheme.typography.bodySmall) }
                 )
             }
 
             item {
                 SwitchButton(
-                    modifier = Modifier.fillMaxWidth().height(40.dp),
-                    checked  = compactMode,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    checked = compactMode,
                     onCheckedChange = {
                         compactMode = it
                         SetupPreferences.setCompactMode(context, it)
                     },
-                    label    = { Text("Compact messages", style = MaterialTheme.typography.bodySmall) }
+                    label = { Text("Compact messages", style = MaterialTheme.typography.bodySmall) }
                 )
             }
 
             item {
                 Text(
                     "NOTIFICATIONS",
-                    style  = MaterialTheme.typography.labelSmall,
-                    color  = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp)
-                )
-            }
-
-            item {
-                SwitchButton(
-                    modifier = Modifier.fillMaxWidth().height(40.dp),
-                    checked  = notificationsEnabled,
-                    onCheckedChange = {
-                        notificationsEnabled = it
-                        SetupPreferences.setNotificationsEnabled(context, it)
-                    },
-                    label    = { Text("New message alerts", style = MaterialTheme.typography.bodySmall) }
-                )
-            }
-
-            item {
-                SwitchButton(
-                    modifier = Modifier.fillMaxWidth().height(40.dp),
-                    checked  = notifyDms,
-                    onCheckedChange = {
-                        notifyDms = it
-                        SetupPreferences.setNotifyDms(context, it)
-                    },
-                    label    = { Text("Direct messages", style = MaterialTheme.typography.bodySmall) }
-                )
-            }
-
-            item {
-                SwitchButton(
-                    modifier = Modifier.fillMaxWidth().height(40.dp),
-                    checked  = notifyMentions,
-                    onCheckedChange = {
-                        notifyMentions = it
-                        SetupPreferences.setNotifyMentions(context, it)
-                    },
-                    label    = { Text("Server mentions", style = MaterialTheme.typography.bodySmall) }
-                )
-            }
-
-            item {
-                Text(
-                    "VENCORD",
-                    style  = MaterialTheme.typography.labelSmall,
-                    color  = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp)
                 )
             }
@@ -239,90 +182,114 @@ fun SettingsScreen(
             item {
                 SwitchButton(
                     modifier = Modifier.fillMaxWidth().height(48.dp),
-                    checked  = sendAnimatedAsGif,
+                    checked = notificationsEnabled,
                     onCheckedChange = {
-                        sendAnimatedAsGif = it
-                        SetupPreferences.setSendAnimatedAsGif(context, it)
+                        notificationsEnabled = it
+                        SetupPreferences.setNotificationsEnabled(context, it)
                     },
-                    label    = {
-                        Column {
-                            Text("Send animated emoji as GIF", style = MaterialTheme.typography.bodySmall)
-                            Text(
-                                "Posts a GIF link instead of <a:emoji:id>",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                    label = { Text("New message alerts", style = MaterialTheme.typography.bodySmall) }
                 )
             }
 
             item {
                 SwitchButton(
-                    modifier = Modifier.fillMaxWidth().height(40.dp),
-                    checked  = hideInaccessible,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    checked = notifyDms,
                     onCheckedChange = {
-                        hideInaccessible = it
-                        SetupPreferences.setHideInaccessibleChannels(context, it)
+                        notifyDms = it
+                        SetupPreferences.setNotifyDms(context, it)
                     },
-                    label    = { Text("Hide locked channels", style = MaterialTheme.typography.bodySmall) }
+                    label = { Text("Direct messages", style = MaterialTheme.typography.bodySmall) }
+                )
+            }
+
+            item {
+                SwitchButton(
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    checked = notifyMentions,
+                    onCheckedChange = {
+                        notifyMentions = it
+                        SetupPreferences.setNotifyMentions(context, it)
+                    },
+                    label = { Text("Server mentions", style = MaterialTheme.typography.bodySmall) }
+                )
+            }
+
+            item {
+                Text(
+                    "MESSAGES",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp)
+                )
+            }
+
+            item {
+                SwitchButton(
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    checked = sendAnimatedAsGif,
+                    onCheckedChange = {
+                        sendAnimatedAsGif = it
+                        SetupPreferences.setSendAnimatedAsGif(context, it)
+                    },
+                    label = { Text("Send animated emoji as GIF", style = MaterialTheme.typography.bodySmall) }
                 )
             }
 
             item {
                 Text(
                     "ACCOUNT",
-                    style  = MaterialTheme.typography.labelSmall,
-                    color  = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp)
                 )
             }
 
             item {
                 Button(
-                    onClick  = { showLogoutConfirm = true },
-                    modifier = Modifier.fillMaxWidth().height(36.dp),
-                    colors   = ButtonDefaults.filledTonalButtonColors()
+                    onClick = { showLogoutConfirm = true },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors()
                 ) { Text("Log Out") }
             }
 
             item {
                 Text(
                     "UPDATE",
-                    style  = MaterialTheme.typography.labelSmall,
-                    color  = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp)
                 )
             }
 
             item {
                 val statusText = when (val s = updateState) {
-                    is UpdateChecker.UpdateState.Idle        -> "v${UpdateChecker.CURRENT_VERSION}"
-                    is UpdateChecker.UpdateState.Checking    -> "Checking…"
-                    is UpdateChecker.UpdateState.UpToDate    -> "v${UpdateChecker.CURRENT_VERSION} (up to date)"
+                    is UpdateChecker.UpdateState.Idle -> "v${UpdateChecker.CURRENT_VERSION}"
+                    is UpdateChecker.UpdateState.Checking -> "Checking…"
+                    is UpdateChecker.UpdateState.UpToDate -> "v${UpdateChecker.CURRENT_VERSION} (up to date)"
                     is UpdateChecker.UpdateState.UpdateAvailable -> "v${s.release.tagName} available!"
-                    is UpdateChecker.UpdateState.Error       -> "Check failed: ${s.message}"
+                    is UpdateChecker.UpdateState.Error -> "Check failed: ${s.message}"
                 }
                 val statusColor = when (updateState) {
                     is UpdateChecker.UpdateState.UpdateAvailable -> MaterialTheme.colorScheme.primary
-                    is UpdateChecker.UpdateState.Error           -> MaterialTheme.colorScheme.error
-                    else                                         -> MaterialTheme.colorScheme.onSurfaceVariant
+                    is UpdateChecker.UpdateState.Error -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
                 }
                 Text(
-                    text      = statusText,
-                    style     = MaterialTheme.typography.labelSmall,
-                    color     = statusColor,
+                    text = statusText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = statusColor,
                     textAlign = TextAlign.Center,
-                    modifier  = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
 
             item {
                 Button(
-                    onClick  = { UpdateChecker.checkNow(context) },
+                    onClick = { UpdateChecker.checkNow(context) },
                     modifier = Modifier.fillMaxWidth().height(36.dp),
-                    enabled  = updateState !is UpdateChecker.UpdateState.Checking,
-                    colors   = ButtonDefaults.filledTonalButtonColors()
+                    enabled = updateState !is UpdateChecker.UpdateState.Checking,
+                    colors = ButtonDefaults.filledTonalButtonColors()
                 ) {
                     Text(
                         if (updateState is UpdateChecker.UpdateState.Checking) "Checking…" else "Check for updates",
@@ -333,7 +300,7 @@ fun SettingsScreen(
 
             if (updateState is UpdateChecker.UpdateState.UpdateAvailable) {
                 val release = (updateState as UpdateChecker.UpdateState.UpdateAvailable).release
-                
+
                 if (release.apkUrl != null) {
                     item {
                         Button(
@@ -344,8 +311,8 @@ fun SettingsScreen(
                                     downloadError = ""
                                     scope.launch {
                                         ApkInstaller.downloadAndInstall(
-                                            context  = context,
-                                            url      = release.apkUrl,
+                                            context = context,
+                                            url = release.apkUrl,
                                             onProgress = { p ->
                                                 downloadProgress = p
                                             }
@@ -355,8 +322,8 @@ fun SettingsScreen(
                                 }
                             },
                             modifier = Modifier.fillMaxWidth().height(36.dp),
-                            enabled  = !downloading,
-                            colors   = ButtonDefaults.buttonColors()
+                            enabled = !downloading,
+                            colors = ButtonDefaults.buttonColors()
                         ) {
                             Text(
                                 if (downloading) "Downloading…" else "Download & Install APK",
@@ -373,7 +340,7 @@ fun SettingsScreen(
                                     modifier = Modifier.fillMaxWidth().height(4.dp)
                                 )
                                 Text(
-                                    text  = "${(downloadProgress * 100).toInt()}%",
+                                    text = "${(downloadProgress * 100).toInt()}%",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.fillMaxWidth(),
@@ -387,8 +354,8 @@ fun SettingsScreen(
                         item {
                             Text(
                                 downloadError,
-                                style  = MaterialTheme.typography.labelSmall,
-                                color  = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
@@ -397,9 +364,9 @@ fun SettingsScreen(
 
                 item {
                     Button(
-                        onClick  = { ApkInstaller.openInPhoneBrowser(context, release.htmlUrl) },
+                        onClick = { ApkInstaller.openInPhoneBrowser(context, release.htmlUrl) },
                         modifier = Modifier.fillMaxWidth().height(36.dp),
-                        colors   = ButtonDefaults.filledTonalButtonColors()
+                        colors = ButtonDefaults.filledTonalButtonColors()
                     ) {
                         Text("Open release on phone", style = MaterialTheme.typography.bodySmall)
                     }
@@ -408,10 +375,10 @@ fun SettingsScreen(
                 item {
                     Text(
                         "Open on phone to download, then sideload via ADB:\nadb install DiscordWear.apk",
-                        style     = MaterialTheme.typography.labelSmall,
-                        color     = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
-                        modifier  = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
                     )
                 }
             }
@@ -419,10 +386,10 @@ fun SettingsScreen(
             item {
                 Text(
                     "DiscordWear v${UpdateChecker.CURRENT_VERSION}",
-                    style     = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelSmall,
                     textAlign = TextAlign.Center,
-                    color     = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier  = Modifier.fillMaxWidth().padding(top = 4.dp)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
                 )
             }
         }

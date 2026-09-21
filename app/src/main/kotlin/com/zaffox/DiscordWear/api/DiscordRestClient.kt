@@ -92,21 +92,15 @@ class DiscordRestClient(private val token: String) {
     }
 
     suspend fun getGuildChannels(
-        guildId: String,
-        filterInaccessible: Boolean = true
+        guildId: String
     ): Result<List<CategoryGroup>> = runCatching {
         val raw = Channel.listFromJson(JSONArray(get("/guilds/$guildId/channels")))
-        // Member + roles only matter for per-channel visibility. Fetch them
-        // concurrently (not sequentially) and skip them entirely when the
-        // caller doesn't filter — each round trip costs seconds on a watch.
-        val (member, roles) = if (filterInaccessible) {
-            coroutineScope {
-                val m = async { getGuildMember(guildId).getOrNull() }
-                val r = async { getGuildRoles(guildId).getOrNull() }
-                m.await() to r.await()
-            }
-        } else {
-            null to null
+        // Per-channel visibility needs the member + roles. Fetch them
+        // concurrently (not sequentially) — each round trip costs seconds on a watch.
+        val (member, roles) = coroutineScope {
+            val m = async { getGuildMember(guildId).getOrNull() }
+            val r = async { getGuildRoles(guildId).getOrNull() }
+            m.await() to r.await()
         }
 
         fun canView(channel: Channel): Boolean {
@@ -128,14 +122,14 @@ class DiscordRestClient(private val token: String) {
 
         val topLevel = byParent[null].orEmpty()
             .map { it.copy(hasAccess = canView(it)) }
-            .filter { !filterInaccessible || it.hasAccess }
+            .filter { it.hasAccess }
             .sortedBy { it.position }
         if (topLevel.isNotEmpty()) groups.add(CategoryGroup(category = null, channels = topLevel))
 
         for (cat in categories) {
             val children = byParent[cat.id].orEmpty()
                 .map { it.copy(hasAccess = canView(it)) }
-                .filter { !filterInaccessible || it.hasAccess }
+                .filter { it.hasAccess }
                 .sortedBy { it.position }
             if (children.isNotEmpty()) groups.add(CategoryGroup(category = cat, channels = children))
         }
