@@ -104,7 +104,8 @@ fun SettingsScreen(
         return
     }
 
-    // Index of the "UPDATE" header item in the list below
+    // Index of the update-status item (right under the UPDATE header):
+    // scrolling here lands the whole update section on screen
     val updateSectionIndex = 14
     LaunchedEffect(Unit) {
         if (scrollToUpdate) {

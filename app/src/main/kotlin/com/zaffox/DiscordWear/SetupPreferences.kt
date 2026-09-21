@@ -178,5 +178,6 @@ object SetupPreferences {
     fun clearAll(context: Context) {
         clearToken(context)
         clearDiscordCache(context)
+        setMockMode(context, false)
     }
 }
