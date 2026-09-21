@@ -204,7 +204,14 @@ fun ChatScreen(
         try {
             val f = File(context.cacheDir, "voice_${System.currentTimeMillis()}.ogg")
             voiceFile = f
-            val mr = MediaRecorder(context)
+            // MediaRecorder(context) needs API 31; the legacy constructor is the
+            // only option below that and throws on unsupported paths otherwise
+            val mr = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                MediaRecorder(context)
+            } else {
+                @Suppress("DEPRECATION")
+                MediaRecorder()
+            }
             mr.setAudioSource(MediaRecorder.AudioSource.MIC)
             mr.setOutputFormat(MediaRecorder.OutputFormat.OGG)
             mr.setAudioEncoder(MediaRecorder.AudioEncoder.OPUS)
