@@ -24,6 +24,10 @@ class MainActivity : ComponentActivity() {
     // Channel to open from a notification tap (channelId, channelName, guildId)
     private val pendingChat = MutableStateFlow<Triple<String, String, String?>?>(null)
 
+    // Open the settings screen from the update notification
+    private val pendingSettings = MutableStateFlow(false)
+    private var settingsScrollToUpdate = false
+
     private val notifPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -94,7 +98,9 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate("Welcome") {
                                         popUpTo(0) { inclusive = true }
                                     }
-                                }
+                                },
+                                scrollToUpdate = settingsScrollToUpdate,
+                                onUpdateShown = { settingsScrollToUpdate = false }
                             )
                         }
 
@@ -175,12 +181,28 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+
+                    androidx.compose.runtime.LaunchedEffect(Unit) {
+                        pendingSettings.collect { open ->
+                            if (open) {
+                                pendingSettings.value = false
+                                if (navController.currentBackStackEntry?.destination?.route != "settings") {
+                                    settingsScrollToUpdate = true
+                                    navController.navigate("settings") { launchSingleTop = true }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 
     private fun consumeIntentExtras(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_OPEN_SETTINGS, false) == true) {
+            pendingSettings.value = true
+            return
+        }
         val channelId = intent?.getStringExtra(EXTRA_CHANNEL_ID) ?: return
         val channelName = intent.getStringExtra(EXTRA_CHANNEL_NAME) ?: channelId
         val guildId = intent.getStringExtra(EXTRA_GUILD_ID)
@@ -210,5 +232,6 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_CHANNEL_ID = "extra_channel_id"
         const val EXTRA_CHANNEL_NAME = "extra_channel_name"
         const val EXTRA_GUILD_ID = "extra_guild_id"
+        const val EXTRA_OPEN_SETTINGS = "extra_open_settings"
     }
 }

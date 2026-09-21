@@ -18,7 +18,9 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
-    onLogOut: () -> Unit = {}
+    onLogOut: () -> Unit = {},
+    scrollToUpdate: Boolean = false,
+    onUpdateShown: () -> Unit = {}
 ) {
     val context   = LocalContext.current
     val listState = rememberScalingLazyListState()
@@ -103,6 +105,15 @@ fun SettingsScreen(
             }
         }
         return
+    }
+
+    // Index of the "UPDATE" header item in the list below
+    val updateSectionIndex = 14
+    LaunchedEffect(Unit) {
+        if (scrollToUpdate) {
+            listState.scrollToItem(updateSectionIndex)
+            onUpdateShown()
+        }
     }
 
     ScreenScaffold(scrollState = listState) {

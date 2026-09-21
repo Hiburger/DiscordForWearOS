@@ -8,4 +8,8 @@
     <string name="notif_channel_messages_desc">New direct messages and mentions</string>
     <string name="notif_listening_title">DiscordWear is connected</string>
     <string name="notif_listening_text">Listening for new messages</string>
+    <string name="notif_channel_updates">App updates</string>
+    <string name="notif_channel_updates_desc">Notifications about new DiscordWear releases</string>
+    <string name="notif_update_title">DiscordWear %1$s is available</string>
+    <string name="notif_update_text">Tap to update</string>
 </resources>
