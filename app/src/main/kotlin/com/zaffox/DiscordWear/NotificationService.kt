@@ -158,15 +158,12 @@ class NotificationService : Service() {
         private const val PERSISTENT_ID = 42
 
         fun start(context: android.content.Context) {
+            if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
             val intent = Intent(context, NotificationService::class.java)
-            if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
-                // permissions not allowed, don't do anything
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
             } else {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(intent)
-                } else {
-                    context.startService(intent)
-                }
+                context.startService(intent)
             }
         }
 
