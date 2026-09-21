@@ -64,6 +64,7 @@ fun WelcomeScreen(onSetupComplete: () -> Unit, onNavigateToQrLogin: () -> Unit) 
             override fun onAvailable(network: Network) {
                 connectivityManager.bindProcessToNetwork(network)
             }
+
             override fun onLost(network: Network) {
                 connectivityManager.bindProcessToNetwork(null)
             }
@@ -139,10 +140,12 @@ fun WelcomeScreen(onSetupComplete: () -> Unit, onNavigateToQrLogin: () -> Unit) 
     }
 
     ScreenScaffold(scrollState = listState) {
-        
+
         ScalingLazyColumn(
             state = listState,
             horizontalAlignment = Alignment.CenterHorizontally,
+            autoCentering = null,
+            contentPadding = PaddingValues(top = 34.dp, bottom = 48.dp),
             modifier = Modifier.fillMaxSize()
         ) {
             item {
@@ -162,30 +165,63 @@ fun WelcomeScreen(onSetupComplete: () -> Unit, onNavigateToQrLogin: () -> Unit) 
                 )
             }
 
+            // all pills match the widest label and center together
             item {
-                Button(
-                    onClick = { onNavigateToQrLogin() },
-                    modifier = Modifier.fillMaxWidth().height(36.dp),
-                ) { Text("Scan QR Code") }
-            }
-
-            item {
-                Button(
-                    onClick = { openTokenInput() },
-                    modifier = Modifier.fillMaxWidth().height(36.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors()
-                ) { Text("Type Token") }
-            }
-
-            if (webServer == null) {
-                item {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.width(IntrinsicSize.Max)
+                ) {
                     Button(
-                        onClick = { startWebServer() },
+                        onClick = { onNavigateToQrLogin() },
+                        modifier = Modifier.fillMaxWidth().height(36.dp),
+                    ) {
+                        Text(
+                            "Scan QR Code",
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    Button(
+                        onClick = { openTokenInput() },
                         modifier = Modifier.fillMaxWidth().height(36.dp),
                         colors = ButtonDefaults.filledTonalButtonColors()
-                    ) { Text("Enter via Browser") }
+                    ) {
+                        Text(
+                            "Type Token",
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    if (webServer == null) {
+                        Button(
+                            onClick = { startWebServer() },
+                            modifier = Modifier.fillMaxWidth().height(36.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors()
+                        ) {
+                            Text(
+                                "Enter via Browser",
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+
+                    Button(
+                        onClick = { showTokenHelp = !showTokenHelp },
+                        modifier = Modifier.fillMaxWidth().height(36.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors()
+                    ) {
+                        Text(
+                            if (showTokenHelp) "Hide token help" else "How do I get a token ?",
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
-            } else {
+            }
+            if (webServer != null) {
                 item {
                     Text(
                         serverStatus,
@@ -207,7 +243,7 @@ fun WelcomeScreen(onSetupComplete: () -> Unit, onNavigateToQrLogin: () -> Unit) 
                 }
                 item {
                     Text(
-                        "Open this address from a phone or PC browser on the same Wi-Fi.",
+                        "Open this address from a phone or PC browser on the same Wi-Fi",
                         style = MaterialTheme.typography.labelSmall,
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -216,25 +252,23 @@ fun WelcomeScreen(onSetupComplete: () -> Unit, onNavigateToQrLogin: () -> Unit) 
                 }
                 item {
                     Button(
-                         onClick = { webServer?.stop(); webServer = null; serverStatus = ""; releaseWifiLock() },
-                         modifier = Modifier.fillMaxWidth().height(36.dp),
-                         colors = ButtonDefaults.filledTonalButtonColors()
-                    ) { Text("Stop Web Server") }
+                        onClick = { webServer?.stop(); webServer = null; serverStatus = ""; releaseWifiLock() },
+                        modifier = Modifier.fillMaxWidth().height(36.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors()
+                    ) {
+                        Text(
+                            "Stop Web Server",
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
-            }
-
-            item {
-                Button(
-                    onClick = { showTokenHelp = !showTokenHelp },
-                    modifier = Modifier.fillMaxWidth().height(36.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors()
-                ) { Text(if (showTokenHelp) "Hide token help" else "How do I get a token ?") }
             }
 
             if (showTokenHelp) {
                 item {
                     Text(
-                        "Easiest: use Scan QR Code above.",
+                        "Easiest: use Scan QR Code above",
                         style = MaterialTheme.typography.labelSmall,
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.primary,
@@ -244,8 +278,8 @@ fun WelcomeScreen(onSetupComplete: () -> Unit, onNavigateToQrLogin: () -> Unit) 
                 item {
                     Text(
                         "Manual: log in to discord.com on a computer, press F12, open the Network tab, " +
-                            "reload the page, tap any request starting with \"api\" and copy its \"Authorization\" " +
-                            "header value. That string is your token.",
+                                "reload the page, tap any request starting with \"api\" and copy its \"Authorization\" " +
+                                "header value. That string is your token.",
                         style = MaterialTheme.typography.labelSmall,
                         textAlign = TextAlign.Center,
                         modifier = Modifier
@@ -255,7 +289,7 @@ fun WelcomeScreen(onSetupComplete: () -> Unit, onNavigateToQrLogin: () -> Unit) 
                 }
             }
 
-           if (error.isNotEmpty()) {
+            if (error.isNotEmpty()) {
                 item {
                     Text(
                         error,
@@ -269,4 +303,3 @@ fun WelcomeScreen(onSetupComplete: () -> Unit, onNavigateToQrLogin: () -> Unit) 
         }
     }
 }
-

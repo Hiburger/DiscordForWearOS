@@ -151,8 +151,8 @@ fun ServerScreen(onNavigateToChannels: (guildId: String, guildName: String) -> U
                 }
                 items(serverPings.size) { index ->
                     val ping = serverPings[index]
-                    PingCard(ping = ping, onClick = {
-                        onNavigateToChannels(ping.message.guildId ?: return@PingCard, ping.guildName ?: return@PingCard)
+                    ServerPingCard(ping = ping, onClick = {
+                        onNavigateToChannels(ping.message.guildId ?: return@ServerPingCard, ping.guildName ?: return@ServerPingCard)
                     })
                 }
             }
@@ -310,7 +310,7 @@ private fun ServerButton(
 }
 
 @Composable
-private fun PingCard(ping: Ping, onClick: () -> Unit) {
+private fun ServerPingCard(ping: Ping, onClick: () -> Unit) {
     TitleCard(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,

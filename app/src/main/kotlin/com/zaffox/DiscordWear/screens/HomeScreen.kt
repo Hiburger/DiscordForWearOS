@@ -25,6 +25,7 @@ fun HomeScreen(
     onNavigateToServers: () -> Unit,
     onNavigateToWelcome: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToMentions: () -> Unit,
     onNavigateToChat: (channelId: String, channelName: String, guildId: String?) -> Unit
 ) {
     val context = LocalContext.current
@@ -56,7 +57,15 @@ fun HomeScreen(
     // so cards appear immediately on load, not only after a new message arrives
     val channelNames = remember(readState) { repo.getChannelNames() }
     val channelGuilds = remember(readState) { repo.getChannelGuilds() }
-    data class MentionEntry(val channelId: String, val channelName: String?, val guildName: String?, val count: Int, val isDm: Boolean)
+
+    data class MentionEntry(
+        val channelId: String,
+        val channelName: String?,
+        val guildName: String?,
+        val count: Int,
+        val isDm: Boolean
+    )
+
     val mentionEntries = remember(readState, dmIds, channelNames, channelGuilds, guilds) {
         readState.entries
             .filter { it.value.mentionCount > 0 }
@@ -74,10 +83,25 @@ fun HomeScreen(
         ScalingLazyColumn(state = listState) {
 
             item {
-                Text(
-                    text = "Discord",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Discord",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f).padding(start = 6.dp)
+                    )
+                    FilledIconButton(
+                        onClick = onNavigateToSettings,
+                        modifier = Modifier.padding(end = 6.dp).height(36.dp).width(36.dp),
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.settings),
+                            contentDescription = "Settings"
+                        )
+                    }
+                }
             }
 
             item {
@@ -86,14 +110,25 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = onNavigateToDms,
                         colors = ButtonDefaults.filledTonalButtonColors()
-                    ) { Text("Direct Messages") }
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.chat),
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Direct Messages")
+                    }
                     if (dmMentionCount > 0) {
                         Box(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(top = 2.dp, end = 2.dp)
                                 .defaultMinSize(minWidth = 18.dp, minHeight = 18.dp)
-                                .background(androidx.compose.ui.graphics.Color(0xFFF23F43), androidx.compose.foundation.shape.CircleShape)
+                                .background(
+                                    androidx.compose.ui.graphics.Color(0xFFF23F43),
+                                    androidx.compose.foundation.shape.CircleShape
+                                )
                                 .padding(horizontal = 4.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -114,14 +149,25 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = onNavigateToServers,
                         colors = ButtonDefaults.filledTonalButtonColors()
-                    ) { Text("Servers") }
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.groups),
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Servers")
+                    }
                     if (serverMentionCount > 0) {
                         Box(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(top = 2.dp, end = 2.dp)
                                 .defaultMinSize(minWidth = 18.dp, minHeight = 18.dp)
-                                .background(androidx.compose.ui.graphics.Color(0xFFF23F43), androidx.compose.foundation.shape.CircleShape)
+                                .background(
+                                    androidx.compose.ui.graphics.Color(0xFFF23F43),
+                                    androidx.compose.foundation.shape.CircleShape
+                                )
                                 .padding(horizontal = 4.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -144,124 +190,56 @@ fun HomeScreen(
                         modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
                     )
                 }
-                // readState-derived cards (visible from startup)
-                items(mentionEntries.size) { index ->
+                // Cap cards shown to top mentions
+                // by count + a couple of live pings, everything else in mentions screen
+                val uncoveredPings = pings.filter { ping ->
+                    mentionEntries.none { it.channelId == ping.message.channelId }
+                }
+                val shownCount = minOf(mentionEntries.size, 4) + minOf(uncoveredPings.size, 2)
+                val totalCount = mentionEntries.size + uncoveredPings.size
+
+                items(minOf(mentionEntries.size, 4)) { index ->
                     val entry = mentionEntries[index]
                     val label = if (entry.isDm) "DM • ${entry.channelName ?: "Unknown"}"
-                                else entry.channelName?.let { "${entry.guildName ?: "Server"} • #$it" }
-                                    ?: (entry.guildName ?: "Server")
+                    else entry.channelName?.let { "${entry.guildName ?: "Server"} • #$it" }
+                        ?: (entry.guildName ?: "Server")
                     MentionCard(
                         label = label,
                         count = entry.count,
                         onClick = {
-                            onNavigateToChat(entry.channelId, entry.channelName ?: entry.channelId, if (entry.isDm) null else channelGuilds[entry.channelId])
+                            onNavigateToChat(
+                                entry.channelId,
+                                entry.channelName ?: entry.channelId,
+                                if (entry.isDm) null else channelGuilds[entry.channelId]
+                            )
                         }
                     )
                 }
-                // live gateway pings not yet in readState (e.g. arrived after last ack)
-                items(pings.size) { index ->
-                    val ping = pings[index]
-                    // Skip if this channel already covered by a readState card above
-                    if (mentionEntries.none { it.channelId == ping.message.channelId }) {
-                        PingCard(ping = ping, onClick = {
-                            onNavigateToChat(ping.message.channelId, ping.channelName, ping.message.guildId)
-                        })
+                items(minOf(uncoveredPings.size, 2)) { index ->
+                    val ping = uncoveredPings[index]
+                    PingCard(ping = ping, onClick = {
+                        onNavigateToChat(ping.message.channelId, ping.channelName, ping.message.guildId)
+                    })
+                }
+                if (totalCount > shownCount) {
+                    item {
+                        Button(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = onNavigateToMentions,
+                            colors = ButtonDefaults.filledTonalButtonColors()
+                        ) { Text("View all ($totalCount)") }
                     }
                 }
             } else {
                 item {
                     Text(
-                        "No mentions yet.",
+                        "No mentions yet",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 6.dp)
                     )
                 }
             }
-            item {
-                FilledIconButton(
-                        onClick = onNavigateToSettings,
-                        modifier = Modifier.height(40.dp).width(40.dp),
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.settings),
-                            contentDescription = "Settings"
-                        )
-                    }
-              }
         }
-    }
-}
-
-@Composable
-private fun MentionCard(label: String, count: Int, onClick: () -> Unit) {
-    TitleCard(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick,
-        title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = if (count > 99) "99+" else "$count",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = androidx.compose.ui.graphics.Color(0xFFF23F43),
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-    ) {
-        Text(
-            text = "Tap to open",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
-private fun PingCard(ping: Ping, onClick: () -> Unit) {
-    val location = if (ping.guildName != null) "${ping.guildName} • #${ping.channelName}"
-                   else "DM • ${ping.channelName}"
-
-    TitleCard(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick,
-        title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = ping.message.author.displayName,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = location,
-                    style = MaterialTheme.typography.bodyExtraSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                )
-            }
-        }
-    ) {
-        Text(
-            text = ping.message.content.take(80),
-            style = MaterialTheme.typography.bodySmall
-        )
     }
 }

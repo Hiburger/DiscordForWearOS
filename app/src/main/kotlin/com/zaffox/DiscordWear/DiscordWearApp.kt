@@ -20,6 +20,13 @@ class DiscordWearApp : Application() {
         NotificationService.start(this)
     }
 
+    fun initMockRepository() {
+        clearRepository()
+        val repo = DiscordRepository("mock-token", context = this, mock = true)
+        repo.connect()
+        repository = repo
+    }
+
     fun clearRepository() {
         NotificationService.stop(this)
         repository?.disconnect()

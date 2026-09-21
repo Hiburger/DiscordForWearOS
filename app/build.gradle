@@ -19,8 +19,8 @@ android {
         applicationId "com.zaffox.discordwear"
         minSdk 30
         targetSdk 36
-        versionCode 13
-        versionName "1.6.3"
+        versionCode 14
+        versionName "1.7.0"
     }
 
     dexOptions {
@@ -35,6 +35,7 @@ android {
 
     buildFeatures {
         compose true
+        buildConfig true
     }
 
     compileOptions {
