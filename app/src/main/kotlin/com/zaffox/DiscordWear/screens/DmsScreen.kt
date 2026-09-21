@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -89,8 +90,13 @@ fun DmsScreen(
                         },
                         modifier = Modifier.fillMaxWidth().height(36.dp),
                         colors = ButtonDefaults.filledTonalButtonColors()
-                    ) { 
-                        Icon(painter = painterResource(id = if (isHiddenMenu) R.drawable.unhide else R.drawable.hide), tint = Color.White, contentDescription = null, modifier = Modifier.size(16.dp))
+                    ) {
+                        Icon(
+                            painter = painterResource(id = if (isHiddenMenu) R.drawable.unhide else R.drawable.hide),
+                            tint = Color.White,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(Modifier.width(6.dp))
                         Text(if (isHiddenMenu) "Unhide" else "Hide")
                     }
@@ -109,12 +115,30 @@ fun DmsScreen(
 
     ScreenScaffold(scrollState = listState) {
         ScalingLazyColumn(state = listState) {
-            item { Text("Direct Messages", style = MaterialTheme.typography.titleMedium) }
+            item {
+                Text(
+                    "Direct Messages",
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             if (loading) {
-                item { CircularProgressIndicator() }
+                item {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) { CircularProgressIndicator() }
+                }
             } else if (sortedDms.isEmpty()) {
-                item { Text("No DMs yet.", style = MaterialTheme.typography.bodySmall) }
+                item {
+                    Text(
+                        "No DMs yet", style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             } else {
                 items(sortedDms.size) { index ->
                     val dm = sortedDms[index]
@@ -237,7 +261,7 @@ private fun DmButton(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-             Box(contentAlignment = Alignment.BottomEnd) {
+            Box(contentAlignment = Alignment.BottomEnd) {
                 Box(modifier = Modifier.size(52.dp), contentAlignment = Alignment.Center) {
                     val avatarAlpha = if (isHidden) 0.38f else 1f
                     if (avatarUrl != null && !isHidden) {
@@ -259,7 +283,14 @@ private fun DmButton(
                             modifier = Modifier.size(38.dp)
                                 .background(Color(0xFF1E1F22).copy(alpha = avatarAlpha), CircleShape),
                             contentAlignment = Alignment.Center
-                        ) { Text(initial, color = Color.White.copy(alpha = avatarAlpha), fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+                        ) {
+                            Text(
+                                initial,
+                                color = Color.White.copy(alpha = avatarAlpha),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
 
                     val decorUrl = recipient?.avatarDecorationUrl()
@@ -307,7 +338,10 @@ private fun DmButton(
 
             Column(modifier = Modifier.weight(1f)) {
                 val nameColor = if (isHidden) Color.White.copy(alpha = 0.38f) else Color.White
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     Text(
                         text = dm.displayName,
                         style = MaterialTheme.typography.bodySmall,
@@ -319,12 +353,20 @@ private fun DmButton(
                     )
                 }
                 if (isHidden) {
-                    Text("Hidden", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.38f), fontSize = 9.sp)
+                    Text(
+                        "Hidden",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.38f),
+                        fontSize = 9.sp
+                    )
                 } else {
                     val customText = presence?.customStatusText
                     val customEmoji = presence?.customStatusEmoji
                     if (customText != null || customEmoji != null) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
                             if (customEmoji != null) {
                                 if (customEmoji.startsWith("http")) {
                                     SubcomposeAsyncImage(
@@ -338,14 +380,18 @@ private fun DmButton(
                                 }
                             }
                             if (customText != null) {
-                                Text(text = customText, style = MaterialTheme.typography.labelSmall,
+                                Text(
+                                    text = customText, style = MaterialTheme.typography.labelSmall,
                                     color = Color.White.copy(alpha = 0.75f), maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis, fontSize = 9.sp)
+                                    overflow = TextOverflow.Ellipsis, fontSize = 9.sp
+                                )
                             }
                         }
                     } else {
-                        Text(text = status.label(), style = MaterialTheme.typography.labelSmall,
-                            color = status.dotColor().copy(alpha = 0.9f), fontSize = 9.sp)
+                        Text(
+                            text = status.label(), style = MaterialTheme.typography.labelSmall,
+                            color = status.dotColor().copy(alpha = 0.9f), fontSize = 9.sp
+                        )
                     }
                 }
             }
