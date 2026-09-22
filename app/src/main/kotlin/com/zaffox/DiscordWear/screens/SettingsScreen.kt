@@ -8,6 +8,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.ScalingLazyListItemScope
+import androidx.wear.compose.foundation.lazy.ScalingLazyListScope
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.*
 import com.zaffox.discordwear.ApkInstaller
@@ -104,12 +106,10 @@ fun SettingsScreen(
         return
     }
 
-    // Index of the update-status item (right under the UPDATE header):
-    // scrolling here lands the whole update section on screen
-    val updateSectionIndex = 14
+    var updateStatusIndex = 0
     LaunchedEffect(Unit) {
         if (scrollToUpdate) {
-            listState.scrollToItem(updateSectionIndex)
+            listState.scrollToItem(updateStatusIndex)
             onUpdateShown()
         }
     }
@@ -117,7 +117,14 @@ fun SettingsScreen(
     ScreenScaffold(scrollState = listState) {
         ScalingLazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
 
-            item {
+            var itemIndex = 0
+            fun indexedItem(content: @Composable ScalingLazyListItemScope.() -> Unit): Int {
+                val index = itemIndex++
+                item(content = content)
+                return index
+            }
+
+            indexedItem {
                 Text(
                     "Settings",
                     style = MaterialTheme.typography.titleMedium,
@@ -126,7 +133,7 @@ fun SettingsScreen(
                 )
             }
 
-            item {
+            indexedItem {
                 Text(
                     "GENERAL",
                     style = MaterialTheme.typography.labelSmall,
@@ -135,7 +142,7 @@ fun SettingsScreen(
                 )
             }
 
-            item {
+            indexedItem {
                 SwitchButton(
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                     checked = showMentionBadges,
@@ -147,7 +154,7 @@ fun SettingsScreen(
                 )
             }
 
-            item {
+            indexedItem {
                 SwitchButton(
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                     checked = spoilerRevealOnTap,
@@ -159,7 +166,7 @@ fun SettingsScreen(
                 )
             }
 
-            item {
+            indexedItem {
                 SwitchButton(
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                     checked = compactMode,
@@ -171,7 +178,7 @@ fun SettingsScreen(
                 )
             }
 
-            item {
+            indexedItem {
                 Text(
                     "NOTIFICATIONS",
                     style = MaterialTheme.typography.labelSmall,
@@ -180,7 +187,7 @@ fun SettingsScreen(
                 )
             }
 
-            item {
+            indexedItem {
                 SwitchButton(
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                     checked = notificationsEnabled,
@@ -192,7 +199,7 @@ fun SettingsScreen(
                 )
             }
 
-            item {
+            indexedItem {
                 SwitchButton(
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                     checked = notifyDms,
@@ -204,7 +211,7 @@ fun SettingsScreen(
                 )
             }
 
-            item {
+            indexedItem {
                 SwitchButton(
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                     checked = notifyMentions,
@@ -216,7 +223,7 @@ fun SettingsScreen(
                 )
             }
 
-            item {
+            indexedItem {
                 Text(
                     "MESSAGES",
                     style = MaterialTheme.typography.labelSmall,
@@ -225,7 +232,7 @@ fun SettingsScreen(
                 )
             }
 
-            item {
+            indexedItem {
                 SwitchButton(
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                     checked = sendAnimatedAsGif,
@@ -237,7 +244,7 @@ fun SettingsScreen(
                 )
             }
 
-            item {
+            indexedItem {
                 Text(
                     "ACCOUNT",
                     style = MaterialTheme.typography.labelSmall,
@@ -246,7 +253,7 @@ fun SettingsScreen(
                 )
             }
 
-            item {
+            indexedItem {
                 Button(
                     onClick = { showLogoutConfirm = true },
                     modifier = Modifier.fillMaxWidth().height(48.dp),
@@ -254,7 +261,7 @@ fun SettingsScreen(
                 ) { Text("Log Out") }
             }
 
-            item {
+            indexedItem {
                 Text(
                     "UPDATE",
                     style = MaterialTheme.typography.labelSmall,
@@ -263,7 +270,7 @@ fun SettingsScreen(
                 )
             }
 
-            item {
+            updateStatusIndex = indexedItem {
                 val statusText = when (val s = updateState) {
                     is UpdateChecker.UpdateState.Idle -> "v${UpdateChecker.CURRENT_VERSION}"
                     is UpdateChecker.UpdateState.Checking -> "Checking…"
@@ -285,10 +292,10 @@ fun SettingsScreen(
                 )
             }
 
-            item {
+            indexedItem {
                 Button(
                     onClick = { UpdateChecker.checkNow(context) },
-                    modifier = Modifier.fillMaxWidth().height(36.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
                     enabled = updateState !is UpdateChecker.UpdateState.Checking,
                     colors = ButtonDefaults.filledTonalButtonColors()
                 ) {
@@ -303,7 +310,7 @@ fun SettingsScreen(
                 val release = (updateState as UpdateChecker.UpdateState.UpdateAvailable).release
 
                 if (release.apkUrl != null) {
-                    item {
+                    indexedItem {
                         Button(
                             onClick = {
                                 if (!downloading) {
@@ -322,7 +329,7 @@ fun SettingsScreen(
                                     }
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth().height(36.dp),
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
                             enabled = !downloading,
                             colors = ButtonDefaults.buttonColors()
                         ) {
@@ -334,7 +341,7 @@ fun SettingsScreen(
                     }
 
                     if (downloading) {
-                        item {
+                        indexedItem {
                             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
                                 LinearProgressIndicator(
                                     progress = { downloadProgress },
@@ -352,7 +359,7 @@ fun SettingsScreen(
                     }
 
                     if (downloadError.isNotEmpty()) {
-                        item {
+                        indexedItem {
                             Text(
                                 downloadError,
                                 style = MaterialTheme.typography.labelSmall,
@@ -363,17 +370,17 @@ fun SettingsScreen(
                     }
                 }
 
-                item {
+                indexedItem {
                     Button(
                         onClick = { ApkInstaller.openInPhoneBrowser(context, release.htmlUrl) },
-                        modifier = Modifier.fillMaxWidth().height(36.dp),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
                         colors = ButtonDefaults.filledTonalButtonColors()
                     ) {
                         Text("Open release on phone", style = MaterialTheme.typography.bodySmall)
                     }
                 }
 
-                item {
+                indexedItem {
                     Text(
                         "Open on phone to download, then sideload via ADB:\nadb install DiscordWear.apk",
                         style = MaterialTheme.typography.labelSmall,
@@ -384,7 +391,7 @@ fun SettingsScreen(
                 }
             }
 
-            item {
+            indexedItem {
                 Text(
                     "DiscordWear v${UpdateChecker.CURRENT_VERSION}",
                     style = MaterialTheme.typography.labelSmall,
@@ -396,3 +403,5 @@ fun SettingsScreen(
         }
     }
 }
+
+// good morning 😴

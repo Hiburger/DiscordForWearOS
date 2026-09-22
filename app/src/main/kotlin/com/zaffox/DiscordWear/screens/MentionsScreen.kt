@@ -36,25 +36,8 @@ fun MentionsScreen(
     val channelNames = remember(readState) { repo.getChannelNames() }
     val channelGuilds = remember(readState) { repo.getChannelGuilds() }
 
-    data class MentionEntry(
-        val channelId: String,
-        val channelName: String?,
-        val guildName: String?,
-        val count: Int,
-        val isDm: Boolean
-    )
-
     val mentionEntries = remember(readState, dmIds, channelNames, channelGuilds, guilds) {
-        readState.entries
-            .filter { it.value.mentionCount > 0 }
-            .map { (channelId, state) ->
-                val isDm = channelId in dmIds
-                val chName = channelNames[channelId]
-                val guildId = channelGuilds[channelId]
-                val guildName = guildId?.let { id -> guilds.firstOrNull { it.id == id }?.name }
-                MentionEntry(channelId, chName, guildName, state.mentionCount, isDm)
-            }
-            .sortedByDescending { it.count }
+        buildMentionEntries(readState, dmIds, channelNames, channelGuilds, guilds)
     }
 
     ScreenScaffold(scrollState = listState) {
@@ -67,11 +50,8 @@ fun MentionsScreen(
             }
             items(mentionEntries.size) { index ->
                 val entry = mentionEntries[index]
-                val label = if (entry.isDm) "DM • ${entry.channelName ?: "Unknown"}"
-                else entry.channelName?.let { "${entry.guildName ?: "Server"} • #$it" }
-                    ?: (entry.guildName ?: "Server")
                 MentionCard(
-                    label = label,
+                    label = entry.label(),
                     count = entry.count,
                     onClick = {
                         onNavigateToChat(
@@ -82,13 +62,12 @@ fun MentionsScreen(
                     }
                 )
             }
-            items(pings.size) { index ->
-                val ping = pings[index]
-                if (mentionEntries.none { it.channelId == ping.message.channelId }) {
-                    PingCard(ping = ping, onClick = {
-                        onNavigateToChat(ping.message.channelId, ping.channelName, ping.message.guildId)
-                    })
-                }
+            val uncovered = uncoveredPings(pings, mentionEntries)
+            items(uncovered.size) { index ->
+                val ping = uncovered[index]
+                PingCard(ping = ping, onClick = {
+                    onNavigateToChat(ping.message.channelId, ping.channelName, ping.message.guildId)
+                })
             }
             if (mentionEntries.isEmpty() && pings.isEmpty()) {
                 item {
