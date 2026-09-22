@@ -295,7 +295,7 @@ fun SettingsScreen(
             indexedItem {
                 Button(
                     onClick = { UpdateChecker.checkNow(context) },
-                    modifier = Modifier.fillMaxWidth().height(36.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
                     enabled = updateState !is UpdateChecker.UpdateState.Checking,
                     colors = ButtonDefaults.filledTonalButtonColors()
                 ) {
@@ -329,7 +329,7 @@ fun SettingsScreen(
                                     }
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth().height(36.dp),
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
                             enabled = !downloading,
                             colors = ButtonDefaults.buttonColors()
                         ) {
@@ -373,7 +373,7 @@ fun SettingsScreen(
                 indexedItem {
                     Button(
                         onClick = { ApkInstaller.openInPhoneBrowser(context, release.htmlUrl) },
-                        modifier = Modifier.fillMaxWidth().height(36.dp),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
                         colors = ButtonDefaults.filledTonalButtonColors()
                     ) {
                         Text("Open release on phone", style = MaterialTheme.typography.bodySmall)
