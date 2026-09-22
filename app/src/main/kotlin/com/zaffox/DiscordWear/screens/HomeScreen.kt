@@ -58,25 +58,8 @@ fun HomeScreen(
     val channelNames = remember(readState) { repo.getChannelNames() }
     val channelGuilds = remember(readState) { repo.getChannelGuilds() }
 
-    data class MentionEntry(
-        val channelId: String,
-        val channelName: String?,
-        val guildName: String?,
-        val count: Int,
-        val isDm: Boolean
-    )
-
     val mentionEntries = remember(readState, dmIds, channelNames, channelGuilds, guilds) {
-        readState.entries
-            .filter { it.value.mentionCount > 0 }
-            .map { (channelId, state) ->
-                val isDm = channelId in dmIds
-                val chName = channelNames[channelId]
-                val guildId = channelGuilds[channelId]
-                val guildName = guildId?.let { id -> guilds.firstOrNull { it.id == id }?.name }
-                MentionEntry(channelId, chName, guildName, state.mentionCount, isDm)
-            }
-            .sortedByDescending { it.count }
+        buildMentionEntries(readState, dmIds, channelNames, channelGuilds, guilds)
     }
 
     ScreenScaffold(scrollState = listState) {
@@ -190,21 +173,15 @@ fun HomeScreen(
                         modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
                     )
                 }
-                // Cap cards shown to top mentions
-                // by count + a couple of live pings, everything else in mentions screen
-                val uncoveredPings = pings.filter { ping ->
-                    mentionEntries.none { it.channelId == ping.message.channelId }
-                }
-                val shownCount = minOf(mentionEntries.size, 4) + minOf(uncoveredPings.size, 2)
-                val totalCount = mentionEntries.size + uncoveredPings.size
+                // Cap cards only show 4 latest mentions everything else in mentions screen
+                val uncovered = uncoveredPings(pings, mentionEntries)
+                val shownCount = minOf(mentionEntries.size, 4) + minOf(uncovered.size, 2)
+                val totalCount = mentionEntries.size + uncovered.size
 
                 items(minOf(mentionEntries.size, 4)) { index ->
                     val entry = mentionEntries[index]
-                    val label = if (entry.isDm) "DM • ${entry.channelName ?: "Unknown"}"
-                    else entry.channelName?.let { "${entry.guildName ?: "Server"} • #$it" }
-                        ?: (entry.guildName ?: "Server")
                     MentionCard(
-                        label = label,
+                        label = entry.label(),
                         count = entry.count,
                         onClick = {
                             onNavigateToChat(
@@ -215,8 +192,8 @@ fun HomeScreen(
                         }
                     )
                 }
-                items(minOf(uncoveredPings.size, 2)) { index ->
-                    val ping = uncoveredPings[index]
+                items(minOf(uncovered.size, 2)) { index ->
+                    val ping = uncovered[index]
                     PingCard(ping = ping, onClick = {
                         onNavigateToChat(ping.message.channelId, ping.channelName, ping.message.guildId)
                     })
