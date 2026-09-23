@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -29,6 +30,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,6 +55,8 @@ import com.zaffox.discordwear.api.*
 import com.zaffox.discordwear.discordApp
 import com.zaffox.discordwear.SetupPreferences
 import com.zaffox.discordwear.R
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.navigation.NavBackStackEntry
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.snapshots.SnapshotStateMap
@@ -66,8 +70,11 @@ fun ChatScreen(
     channelId: String,
     channelName: String,
     guildId: String? = null,
+    navEntry: NavBackStackEntry? = null,
     currentUserId: String = "",
     onNavigateToProfile: ((userId: String, user: DiscordUser?) -> Unit)? = null,
+    onOpenCompose: () -> Unit = {},
+    onOpenMessageOptions: (msgId: String) -> Unit = {},
     onBack: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -91,13 +98,11 @@ fun ChatScreen(
     val typingMap by repo.typing.collectAsState()
     var loading by remember { mutableStateOf(true) }
     var sendError by remember { mutableStateOf("") }
-    var showPicker by remember { mutableStateOf(false) }
-    var tab by remember { mutableStateOf(0) } // 0 = emoji, 1 = stickers
-    var inputText by remember { mutableStateOf("") }
-    var pendingText by remember { mutableStateOf("") }
-    var replyingTo by remember { mutableStateOf<DiscordMessage?>(null) }
-    var selectedMsg by remember { mutableStateOf<DiscordMessage?>(null) }
-    var reactingToMsg by remember { mutableStateOf<DiscordMessage?>(null) }
+    var inputText by rememberSaveable { mutableStateOf("") }
+    var pendingText by rememberSaveable { mutableStateOf("") }
+    var replyToId by rememberSaveable { mutableStateOf("") }
+    val replyingTo = replyToId.takeIf { it.isNotEmpty() }
+        ?.let { id -> messages.firstOrNull { it.id == id } }
     val roleColorCache = remember { mutableStateMapOf<String, GuildRole?>() }
     val channelNames = remember(messages.size, loading) { repo.getChannelNames() }
 
@@ -115,11 +120,9 @@ fun ChatScreen(
     }
     val currentUser by repo.currentUser.collectAsState()
     val myId = currentUser?.id ?: currentUserId
-    val hasNitro = currentUser?.hasNitro ?: false
     val typingUsers = remember(typingMap, channelId, myId) {
         (typingMap[channelId] ?: emptySet()).filter { it != myId }
     }
-    val sendAnimatedAsGif = SetupPreferences.getSendAnimatedAsGif(context)
     val spoilerRevealOnTap = remember { SetupPreferences.getSpoilerRevealOnTap(context) }
     val compactMode = remember { SetupPreferences.getCompactMode(context) }
     val slowModeSecs = remember(channelId) { repo.getSlowModeSeconds(channelId) }
@@ -154,15 +157,15 @@ fun ChatScreen(
                 val lastReadIdx = messages.indexOfLast { it.id <= lastRead }
                 when {
                     lastReadIdx >= 0 -> {
-                        scope.launch { listState.animateScrollToItem(lastReadIdx + 1) }
+                        scope.launch { listState.animateScrollToItem(lastReadIdx) }
                     }
 
                     else -> {
-                        scope.launch { listState.animateScrollToItem(1) }
+                        scope.launch { listState.animateScrollToItem(0) }
                     }
                 }
             } else {
-                scope.launch { listState.animateScrollToItem(messages.size + 1) }
+                scope.launch { listState.animateScrollToItem((messages.size - 1).coerceAtLeast(0)) }
             }
         }
     }
@@ -173,17 +176,7 @@ fun ChatScreen(
         }
     }
 
-    var editingMsg by remember { mutableStateOf<DiscordMessage?>(null) }
-    var editText by remember { mutableStateOf("") }
-
     var uploadError by remember { mutableStateOf("") }
-    var showPhotoPicker by remember { mutableStateOf(false) }
-    val imagePermLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) showPhotoPicker = true
-        else uploadError = "Photo permission denied"
-    }
 
     var isRecording by remember { mutableStateOf(false) }
     var recordingSecs by remember { mutableStateOf(0) }
@@ -272,224 +265,21 @@ fun ChatScreen(
         }
     }
 
-    fun openEdit(msg: DiscordMessage) {
-        editingMsg = msg
-        editText = msg.content
-    }
-
-    BackHandler(enabled = showPicker) {
-        showPicker = false
-        reactingToMsg = null
-    }
-    BackHandler(enabled = editingMsg != null) {
-        editingMsg = null
-        editText = ""
-    }
     BackHandler(enabled = isRecording) {
         cancelRecording()
     }
-    BackHandler(enabled = showPhotoPicker) {
-        showPhotoPicker = false
-    }
 
-    if (showPhotoPicker) {
-        PhotoPickerScreen(
-            imageLoader = imageLoader,
-            onImageSelected = { uri, mime ->
-                showPhotoPicker = false
-                scope.launch {
-                    runCatching {
-                        val cr = context.contentResolver
-                        val ext = when {
-                            mime.contains("png") -> "png"
-                            mime.contains("gif") -> "gif"
-                            mime.contains("webp") -> "webp"
-                            else -> "jpg"
-                        }
-                        val bytes = cr.openInputStream(uri)?.readBytes()
-                            ?: throw Exception("Cannot read image")
-                        repo.sendFileAttachment(channelId, bytes, "image.$ext", mime)
-                            .onFailure { uploadError = "Upload failed: ${it.message}" }
-                    }.onFailure { uploadError = "Error: ${it.message}" }
-                }
-            },
-            onDismiss = { showPhotoPicker = false }
-        )
-        return
-    }
 
-    val msgBeingEdited = editingMsg
-    if (msgBeingEdited != null) {
-        val editListState = rememberScalingLazyListState()
-        ScreenScaffold(scrollState = editListState) {
-            ScalingLazyColumn(state = editListState, modifier = Modifier.fillMaxSize()) {
-                item {
-                    Text(
-                        "Edit message",
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                }
-                item {
-                    OutlinedTextField(
-                        value = editText,
-                        onValueChange = { editText = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        label = { Text("Edit", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                        textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
-                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            cursorColor = MaterialTheme.colorScheme.primary
-                        ),
-                        minLines = 1,
-                        maxLines = 4,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
-                    )
-                }
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        Button(
-                            onClick = {
-                                val text = editText.trim()
-                                if (text.isNotBlank()) {
-                                    scope.launch {
-                                        repo.editMessage(channelId, msgBeingEdited.id, text)
-                                            .onFailure { sendError = "Failed: ${it.message}" }
-                                        editingMsg = null
-                                        editText = ""
-                                    }
-                                }
-                            },
-                            modifier = Modifier.weight(1f).height(36.dp),
-                            colors = ButtonDefaults.filledTonalButtonColors(),
-                            enabled = editText.isNotBlank()
-                        ) { Text("Save") }
-                        Spacer(Modifier.width(8.dp))
-                        Button(
-                            onClick = { editingMsg = null; editText = "" },
-                            modifier = Modifier.weight(1f).height(36.dp),
-                            colors = ButtonDefaults.outlinedButtonColors()
-                        ) { Text("Cancel") }
-                    }
-                }
-            }
+    LaunchedEffect(Unit) {
+        navEntry?.savedStateHandle?.remove<String>("insertEmoji")?.let { insert ->
+            val newText = if (inputText.isBlank()) insert else "$inputText$insert"
+            inputText = newText
+            pendingText = newText
         }
-        return
-    }
-
-    if (showPicker) {
-        val isReactMode = reactingToMsg != null
-        EmojiStickerScreen(
-            tab = if (isReactMode) 0 else tab,
-            guildId = guildId,
-            hasNitro = hasNitro,
-            sendAnimatedAsGif = sendAnimatedAsGif,
-            reactMode = isReactMode,
-            onEmojiPicked = { insertText ->
-                showPicker = false
-                val target = reactingToMsg
-                if (target != null) {
-                    val reactionEmoji = parseInsertTextToReactionEmoji(insertText)
-                    if (reactionEmoji != null) {
-                        scope.launch {
-                            try {
-                                repo.toggleReaction(channelId, target.id, reactionEmoji)
-                            } catch (e: Exception) {
-                                sendError = "Failed: ${e.message}"
-                            }
-                        }
-                    }
-                    reactingToMsg = null
-                } else {
-                    val isAnimated = insertText.startsWith("<a:")
-                    if (isAnimated && sendAnimatedAsGif) {
-                        showPicker = false
-                        val link = buildEmojiLink(insertText)
-                        scope.launch {
-                            repo.sendMessage(channelId, link)
-                                .onFailure { sendError = "Failed: ${it.message}" }
-                        }
-                    } else {
-                        val newText = if (inputText.isBlank()) insertText else "$inputText$insertText"
-                        inputText = newText
-                        pendingText = newText
-                    }
-                }
-            },
-            onUnicodeEmojiPicked = { unicode ->
-                showPicker = false
-                val target = reactingToMsg
-                if (target != null) {
-                    val reactionEmoji = ReactionEmoji(id = null, name = unicode, animated = false)
-                    scope.launch {
-                        try {
-                            repo.toggleReaction(channelId, target.id, reactionEmoji)
-                        } catch (e: Exception) {
-                            sendError = "Failed: ${e.message}"
-                        }
-                    }
-                    reactingToMsg = null
-                } else {
-                    val newText = if (inputText.isBlank()) unicode else "$inputText$unicode"
-                    inputText = newText
-                    pendingText = newText
-                }
-            },
-            onStickerPicked = { stickerId ->
-                showPicker = false
-                reactingToMsg = null
-                scope.launch {
-                    try {
-                        repo.sendSticker(channelId, stickerId)
-                    } catch (e: Exception) {
-                        sendError = "Failed: ${e.message}"
-                    }
-                }
-            }
-        )
-        return
-    }
-
-    val msgForOptions = selectedMsg
-    if (msgForOptions != null) {
-        MessageOptionsDialog(
-            msg = msgForOptions,
-            isOwn = msgForOptions.author.id == myId,
-            onReply = {
-                replyingTo = msgForOptions
-                selectedMsg = null
-            },
-            onCopy = {
-                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE)
-                        as android.content.ClipboardManager
-                clipboard.setPrimaryClip(
-                    android.content.ClipData.newPlainText("message", msgForOptions.content)
-                )
-                selectedMsg = null
-            },
-            onEdit = {
-                selectedMsg = null
-                openEdit(msgForOptions)
-            },
-            onDelete = {
-                scope.launch {
-                    repo.deleteMessage(channelId, msgForOptions.id)
-                        .onFailure { sendError = "Failed: ${it.message}" }
-                }
-                selectedMsg = null
-            },
-            onReact = {
-                reactingToMsg = msgForOptions
-                selectedMsg = null
-                showPicker = true
-            },
-            onDismiss = { selectedMsg = null }
-        )
-        return
+        if (navEntry?.savedStateHandle?.remove<Boolean>("startRecording") == true) {
+            startRecording()
+        }
+        navEntry?.savedStateHandle?.remove<String>("replyToId")?.let { replyToId = it }
     }
 
     if (loading) {
@@ -506,30 +296,21 @@ fun ChatScreen(
         derivedStateOf {
             val info = listState.layoutInfo
             val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 5
-            info.totalItemsCount == 5 || lastVisible >= info.totalItemsCount - 6
+            info.totalItemsCount == 4 || lastVisible >= info.totalItemsCount - 6
         }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        ScreenScaffold(scrollState = listState) {
-            ScalingLazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-                item(key = "channel_title") {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.back),
-                            contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .size(24.dp)
-                                .clickable(onClick = onBack)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text("#$channelName", style = MaterialTheme.typography.titleMedium)
-                    }
-                }
+        ScreenScaffold(scrollState = listState, timeText = {}) {
+            ScalingLazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                autoCentering = null,
+                contentPadding = PaddingValues(top = 48.dp),
+                flingBehavior = ScrollableDefaults.flingBehavior()
+            ) {
+                // channel header pinned at the top of the Box below; DMs skip it
+                // it's already on every row and the user probably knows who he's talking to right :p
 
                 if (pendingText.isNotBlank()) {
                     item(key = "pending_text") {
@@ -570,7 +351,7 @@ fun ChatScreen(
                                                 if (replyTarget != null) {
                                                     repo.sendReply(channelId, text, replyTarget.id)
                                                         .onFailure { sendError = "Failed: ${it.message}" }
-                                                    replyingTo = null
+                                                    replyToId = ""
                                                 } else {
                                                     repo.sendMessage(channelId, text)
                                                         .onFailure { sendError = "Failed: ${it.message}" }
@@ -636,13 +417,17 @@ fun ChatScreen(
                                 scope.launch { repo.toggleReaction(channelId, msg.id, emoji) }
                             },
                             onSwipeLeft = {
-                                replyingTo = msg
+                                replyToId = msg.id
                             },
                             onLongPress = {
-                                selectedMsg = msg
+                                // important! Navigating away disposes this screen; that would
+                                // orphan the recorder
+                                if (!isRecording) onOpenMessageOptions(msg.id)
                             },
                             onAvatarClick = { userId ->
-                                onNavigateToProfile?.invoke(userId, msg.author.takeIf { it.id == userId })
+                                if (!isRecording) {
+                                    onNavigateToProfile?.invoke(userId, msg.author.takeIf { it.id == userId })
+                                }
                             }
                         )
                     }
@@ -702,7 +487,7 @@ fun ChatScreen(
                                     "X",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.clickable { replyingTo = null }.padding(4.dp)
+                                    modifier = Modifier.clickable { replyToId = "" }.padding(4.dp)
                                 )
                             }
                         }
@@ -714,20 +499,61 @@ fun ChatScreen(
                                     inputText = newValue
                                     pendingText = newValue
                                 },
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth(0.8f)
+                                    .align(Alignment.CenterHorizontally)
+                                    .height(48.dp),
                                 shape = RoundedCornerShape(16.dp),
                                 placeholder = {
                                     Text(
                                         "Message #$channelName",
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     )
                                 },
                                 textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
                                 colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
                                     focusedTextColor = MaterialTheme.colorScheme.onSurface,
                                     unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.primary,
                                     cursorColor = MaterialTheme.colorScheme.primary
                                 ),
+                                trailingIcon = {
+                                    FilledIconButton(
+                                        onClick = {
+                                            val text = inputText.trim()
+                                            if (text.isBlank() || slowRemaining > 0) return@FilledIconButton
+                                            inputText = ""
+                                            pendingText = ""
+                                            scope.launch {
+                                                slowRemaining = slowModeSecs
+                                                val replyTarget = replyingTo
+                                                if (replyTarget != null) {
+                                                    repo.sendReply(channelId, text, replyTarget.id)
+                                                        .onFailure { sendError = "Failed: ${it.message}" }
+                                                    replyToId = ""
+                                                } else {
+                                                    repo.sendMessage(channelId, text)
+                                                        .onFailure { sendError = "Failed: ${it.message}" }
+                                                }
+                                                while (true) {
+                                                    delay(1_000)
+                                                    slowRemaining = repo.slowModeRemainingSeconds(channelId)
+                                                    if (slowRemaining <= 0) break
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.size(32.dp),
+                                        enabled = inputText.isNotBlank() && slowRemaining <= 0
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.send),
+                                            contentDescription = "Send"
+                                        )
+                                    }
+                                },
                                 minLines = 1,
                                 maxLines = 4,
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
@@ -746,110 +572,28 @@ fun ChatScreen(
                 item(key = "action_buttons") {
                     if (canSend) {
                         Column(modifier = Modifier.fillMaxWidth()) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(6.dp),
-                                horizontalArrangement = Arrangement.spacedBy(
-                                    space = 16.dp,
-                                    alignment = Alignment.CenterHorizontally
-                                )
-                            ) {
-                                FilledIconButton(
-                                    onClick = {
-                                        reactingToMsg = null
-                                        showPicker = true
-                                        tab = 0
-                                    },
-                                    modifier = Modifier.height(40.dp).width(40.dp),
-                                ) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.emoji),
-                                        contentDescription = "Emoji"
-                                    )
-                                }
-                                FilledIconButton(
-                                    onClick = {
-                                        reactingToMsg = null
-                                        showPicker = true
-                                        tab = 1
-                                    },
-                                    modifier = Modifier.height(40.dp).width(40.dp),
-                                ) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.sticker),
-                                        contentDescription = "Stickers"
-                                    )
-                                }
-                                FilledIconButton(
-                                    onClick = {
-                                        val text = inputText.trim()
-                                        if (text.isBlank() || slowRemaining > 0) return@FilledIconButton
-                                        inputText = ""
-                                        pendingText = ""
-                                        scope.launch {
-                                            slowRemaining = slowModeSecs
-                                            val replyTarget = replyingTo
-                                            if (replyTarget != null) {
-                                                repo.sendReply(channelId, text, replyTarget.id)
-                                                    .onFailure { sendError = "Failed: ${it.message}" }
-                                                replyingTo = null
-                                            } else {
-                                                repo.sendMessage(channelId, text)
-                                                    .onFailure { sendError = "Failed: ${it.message}" }
-                                            }
-                                            while (true) {
-                                                delay(1_000)
-                                                slowRemaining = repo.slowModeRemainingSeconds(channelId)
-                                                if (slowRemaining <= 0) break
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier.height(40.dp).width(40.dp),
-                                    enabled = inputText.isNotBlank() && slowRemaining <= 0
-                                ) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.send),
-                                        contentDescription = "Send"
-                                    )
-                                }
-                            }
-
                             if (!isRecording) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(6.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(
-                                        space = 16.dp,
-                                        alignment = Alignment.CenterHorizontally
-                                    )
-
+                                    horizontalArrangement = Arrangement.Center
                                 ) {
                                     FilledIconButton(
-                                        onClick = {
-                                            val perm = if (android.os.Build.VERSION.SDK_INT >= 33)
-                                                Manifest.permission.READ_MEDIA_IMAGES
-                                            else
-                                                Manifest.permission.READ_EXTERNAL_STORAGE
-                                            val hasPerm = ContextCompat.checkSelfPermission(context, perm) ==
-                                                    PackageManager.PERMISSION_GRANTED
-                                            if (hasPerm) {
-                                                showPhotoPicker = true
-                                            } else {
-                                                imagePermLauncher.launch(perm)
-                                            }
-                                        },
+                                        onClick = onBack,
                                         modifier = Modifier.height(40.dp).width(40.dp),
                                     ) {
                                         Icon(
-                                            painter = painterResource(id = R.drawable.image),
-                                            contentDescription = "Upload Photo"
+                                            painter = painterResource(id = R.drawable.back),
+                                            contentDescription = "Back"
                                         )
                                     }
+                                    Spacer(Modifier.width(16.dp))
                                     FilledIconButton(
-                                        onClick = { startRecording() },
+                                        onClick = { onOpenCompose() },
                                         modifier = Modifier.height(40.dp).width(40.dp),
                                     ) {
                                         Icon(
-                                            painter = painterResource(id = R.drawable.mic),
-                                            contentDescription = "Voice Message"
+                                            painter = painterResource(id = R.drawable.add),
+                                            contentDescription = "Compose Actions"
                                         )
                                     }
                                 }
@@ -899,9 +643,27 @@ fun ChatScreen(
                     }
                 }
             }
+
+            // pinned channel header (server channels only): fixed strip at
+            // the top, independent of the message count
+            if (guildId != null) {
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(top = 26.dp, bottom = 2.dp)
+                ) {
+                    Text("#$channelName", style = MaterialTheme.typography.titleSmall)
+                }
+            }
         }
 
-        if (!isAtBottom) { //need to be higher up to show this
+
+        TimeText()
+
+        if (!isAtBottom) { // need to be higher up to show this
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -943,11 +705,12 @@ private fun SpoilerText(text: String, revealOnTap: Boolean) {
     }
 }
 
-private fun buildEmojiLink(insertText: String): String {
+internal fun buildEmojiLink(insertText: String): String {
     val animated = Regex("""<a:(\w+):(\d+)>""").find(insertText) ?: return insertText
     val id = animated.groupValues[2]
     return "https://cdn.discordapp.com/emojis/$id.webp?size=80"
 }
+
 
 fun parseInsertTextToReactionEmoji(insertText: String): ReactionEmoji? {
     val animatedMatch = Regex("""<a:(\w+):(\d+)>""").find(insertText)
@@ -973,16 +736,19 @@ fun parseInsertTextToReactionEmoji(insertText: String): ReactionEmoji? {
 }
 
 @Composable
-private fun MessageOptionsDialog(
+internal fun MessageOptionsScreen(
     msg: DiscordMessage,
     isOwn: Boolean,
+    channelId: String,
     onReply: () -> Unit,
-    onCopy: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit,
     onReact: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+    val repo = context.discordApp.repository
+    val scope = rememberCoroutineScope()
+    var actionError by remember { mutableStateOf("") }
     BackHandler(onBack = onDismiss)
     val listState = rememberScalingLazyListState()
     ScreenScaffold(scrollState = listState) {
@@ -1028,7 +794,14 @@ private fun MessageOptionsDialog(
             }
             item {
                 Button(
-                    onClick = onCopy,
+                    onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE)
+                                as android.content.ClipboardManager
+                        clipboard.setPrimaryClip(
+                            android.content.ClipData.newPlainText("message", msg.content)
+                        )
+                        onDismiss()
+                    },
                     modifier = Modifier.fillMaxWidth().height(36.dp),
                     colors = ButtonDefaults.filledTonalButtonColors()
                 ) {
@@ -1061,7 +834,13 @@ private fun MessageOptionsDialog(
                 }
                 item {
                     Button(
-                        onClick = onDelete,
+                        onClick = {
+                            scope.launch {
+                                repo?.deleteMessage(channelId, msg.id)
+                                    ?.onFailure { actionError = "Failed: ${it.message}" }
+                                    ?.onSuccess { onDismiss() }
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth().height(36.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.error
@@ -1076,6 +855,16 @@ private fun MessageOptionsDialog(
                         Spacer(Modifier.width(6.dp))
                         Text("Delete")
                     }
+                }
+            }
+            if (actionError.isNotEmpty()) {
+                item {
+                    Text(
+                        actionError,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.clickable { actionError = "" }
+                    )
                 }
             }
             item {
@@ -1138,37 +927,11 @@ private fun MessageBubble(
                 )
             }
             .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val down = awaitPointerEvent()
-                        if (down.changes.any { it.pressed }) {
-                            val startPos = down.changes.first().position
-                            val timeout = 500L
-                            val endTime = System.currentTimeMillis() + timeout
-                            var lifted = false
-                            var moved = false
-                            while (System.currentTimeMillis() < endTime) {
-                                val ev = awaitPointerEvent()
-                                if (ev.changes.all { !it.pressed }) {
-                                    lifted = true
-                                    break
-                                }
-                                // Check if pointer moved more than 10dp, if so, it's a scroll/drag
-                                val currentPos = ev.changes.first().position
-                                val distance = (currentPos - startPos).getDistance()
-                                if (distance > 10f * density) {
-                                    moved = true
-                                    break
-                                }
-                            }
-                            if (!lifted && !moved) {
-                                onLongPress()
-                                val ev = awaitPointerEvent()
-                                ev.changes.forEach { it.consume() }
-                            }
-                        }
-                    }
-                }
+                // on scroll the app shouldnt register a long press and show the long press menu
+                // that's something that happened quite often and was annoying
+                detectTapGestures(
+                    onLongPress = { onLongPress() }
+                )
             },
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.Top
@@ -1797,5 +1560,197 @@ private fun DiscordAvatar(url: String?, displayName: String, imageLoader: ImageL
                 }
             }
         )
+    }
+}
+
+
+@Composable
+internal fun ComposeActionsScreen(
+    onOpenEmoji: () -> Unit,
+    onOpenStickers: () -> Unit,
+    onOpenPhoto: () -> Unit,
+    onVoice: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val imagePermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) onOpenPhoto()
+    }
+    BackHandler(onBack = onDismiss)
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(top = 30.dp),
+            verticalArrangement = Arrangement.Center
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Spacer(Modifier.width(36.dp))
+                Text(
+                    "Compose",
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.weight(0.18f))
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    FilledIconButton(
+                        onClick = onOpenEmoji,
+                        modifier = Modifier.height(44.dp).width(44.dp),
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.emoji),
+                            contentDescription = "Emoji"
+                        )
+                    }
+                    Text("Emoji", style = MaterialTheme.typography.labelSmall)
+                }
+                Spacer(Modifier.width(20.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    FilledIconButton(
+                        onClick = onOpenStickers,
+                        modifier = Modifier.height(44.dp).width(44.dp),
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.sticker),
+                            contentDescription = "Stickers"
+                        )
+                    }
+                    Text("Stickers", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    FilledIconButton(
+                        onClick = {
+                            val perm = if (android.os.Build.VERSION.SDK_INT >= 33)
+                                Manifest.permission.READ_MEDIA_IMAGES
+                            else
+                                Manifest.permission.READ_EXTERNAL_STORAGE
+                            val hasPerm = ContextCompat.checkSelfPermission(context, perm) ==
+                                    PackageManager.PERMISSION_GRANTED
+                            if (hasPerm) {
+                                onOpenPhoto()
+                            } else {
+                                imagePermLauncher.launch(perm)
+                            }
+                        },
+                        modifier = Modifier.height(44.dp).width(44.dp),
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.image),
+                            contentDescription = "Upload Photo"
+                        )
+                    }
+                    Text("Photo", style = MaterialTheme.typography.labelSmall)
+                }
+                Spacer(Modifier.width(20.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    FilledIconButton(
+                        onClick = onVoice,
+                        modifier = Modifier.height(44.dp).width(44.dp),
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.mic),
+                            contentDescription = "Voice Message"
+                        )
+                    }
+                    Text("Voice", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun EditChatScreen(
+    channelId: String,
+    msg: DiscordMessage,
+    onDismiss: () -> Unit
+) {
+    val repo = LocalContext.current.discordApp.repository
+    val scope = rememberCoroutineScope()
+    var editText by rememberSaveable { mutableStateOf(msg.content) }
+    var editError by remember { mutableStateOf("") }
+    BackHandler(onBack = onDismiss)
+    val editListState = rememberScalingLazyListState()
+    ScreenScaffold(scrollState = editListState) {
+        ScalingLazyColumn(state = editListState, modifier = Modifier.fillMaxSize()) {
+            item {
+                Text(
+                    "Edit message",
+                    style = MaterialTheme.typography.titleSmall
+                )
+            }
+            item {
+                OutlinedTextField(
+                    value = editText,
+                    onValueChange = { editText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    label = { Text("Edit", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        cursorColor = MaterialTheme.colorScheme.primary
+                    ),
+                    minLines = 1,
+                    maxLines = 4,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
+                )
+            }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Button(
+                        onClick = {
+                            val text = editText.trim()
+                            if (text.isNotBlank()) {
+                                scope.launch {
+                                    repo?.editMessage(channelId, msg.id, text)
+                                        ?.onFailure { editError = "Failed: ${it.message}" }
+                                        ?.onSuccess { onDismiss() }
+                                }
+                            }
+                        },
+                        modifier = Modifier.weight(1f).height(36.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(),
+                        enabled = editText.isNotBlank()
+                    ) { Text("Save") }
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f).height(36.dp),
+                        colors = ButtonDefaults.outlinedButtonColors()
+                    ) { Text("Cancel") }
+                }
+            }
+            if (editError.isNotEmpty()) {
+                item {
+                    Text(
+                        editError,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.clickable { editError = "" }
+                    )
+                }
+            }
+        }
     }
 }
