@@ -56,7 +56,8 @@ private fun ChannelIcon(ch: Channel, allChannels: List<Channel>) {
 fun ServerChannels(
     guildId: String,
     guildName: String,
-    onNavigateToChatScreen: (channelId: String, channelName: String) -> Unit
+    onNavigateToChatScreen: (channelId: String, channelName: String) -> Unit,
+    onBack: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val repo = context.discordApp.repository
@@ -193,15 +194,16 @@ fun ServerChannels(
                                     if (mentionCount > 0) {
                                         Box(
                                             modifier = Modifier
-                                                .defaultMinSize(minWidth = 16.dp, minHeight = 16.dp)
+                                                .offset(x = 3.dp)
+                                                .defaultMinSize(minWidth = 20.dp, minHeight = 20.dp)
                                                 .background(Color(0xFFF23F43), CircleShape)
-                                                .padding(horizontal = 4.dp),
+                                                .padding(horizontal = 5.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
                                                 text = if (mentionCount > 99) "99+" else mentionCount.toString(),
                                                 color = Color.White,
-                                                fontSize = 8.sp,
+                                                fontSize = 10.sp,
                                                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                                             )
                                         }
@@ -215,6 +217,23 @@ fun ServerChannels(
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    FilledIconButton(
+                        onClick = onBack,
+                        modifier = Modifier.height(40.dp).width(40.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.back),
+                            contentDescription = "Back"
+                        )
                     }
                 }
             }
