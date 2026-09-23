@@ -707,21 +707,23 @@ fun ChatScreen(
                             }
                         }
 
-                        if (canSend) {
-                            OutlinedTextField(
-                                value = inputText,
-                                onValueChange = { newValue ->
-                                    inputText = newValue
-                                    pendingText = newValue
-                                },
-                                modifier = Modifier.fillMaxWidth(),
+                         if (canSend) {
+                             OutlinedTextField(
+                                 value = inputText,
+                                 onValueChange = { newValue ->
+                                     inputText = newValue
+                                     pendingText = newValue
+                                 },
+                                 modifier = Modifier.fillMaxWidth().height(48.dp),
                                 shape = RoundedCornerShape(16.dp),
-                                placeholder = {
-                                    Text(
-                                        "Message #$channelName",
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                },
+                                 placeholder = {
+                                     Text(
+                                         "Message #$channelName",
+                                         style = MaterialTheme.typography.bodySmall.copy(
+                                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                                         )
+                                     )
+                                 },
                                 textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
                                 colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
                                     focusedTextColor = MaterialTheme.colorScheme.onSurface,
@@ -1138,37 +1140,11 @@ private fun MessageBubble(
                 )
             }
             .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val down = awaitPointerEvent()
-                        if (down.changes.any { it.pressed }) {
-                            val startPos = down.changes.first().position
-                            val timeout = 500L
-                            val endTime = System.currentTimeMillis() + timeout
-                            var lifted = false
-                            var moved = false
-                            while (System.currentTimeMillis() < endTime) {
-                                val ev = awaitPointerEvent()
-                                if (ev.changes.all { !it.pressed }) {
-                                    lifted = true
-                                    break
-                                }
-                                // Check if pointer moved more than 10dp, if so, it's a scroll/drag
-                                val currentPos = ev.changes.first().position
-                                val distance = (currentPos - startPos).getDistance()
-                                if (distance > 10f * density) {
-                                    moved = true
-                                    break
-                                }
-                            }
-                            if (!lifted && !moved) {
-                                onLongPress()
-                                val ev = awaitPointerEvent()
-                                ev.changes.forEach { it.consume() }
-                            }
-                        }
-                    }
-                }
+                // on scroll the app shouldnt register a long press and show the long press menu
+                // that's something that happened quite often and was annoying
+                detectTapGestures(
+                    onLongPress = { onLongPress() }
+                )
             },
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.Top
