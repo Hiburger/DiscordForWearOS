@@ -492,6 +492,16 @@ fun ChatScreen(
         return
     }
 
+    if (loading) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
     val isAtBottom by remember {
         derivedStateOf {
             val info = listState.layoutInfo
@@ -591,7 +601,6 @@ fun ChatScreen(
                 }
 
                 when {
-                    loading -> item(key = "loading") { CircularProgressIndicator() }
                     messages.isEmpty() -> item(key = "empty") {
                         Text("No messages yet", style = MaterialTheme.typography.bodySmall)
                     }
