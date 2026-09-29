@@ -105,7 +105,12 @@ fun ServerScreen(onNavigateToChannels: (guildId: String, guildName: String) -> U
                         modifier = Modifier.fillMaxWidth().height(36.dp),
                         colors = ButtonDefaults.filledTonalButtonColors()
                     ) {
-                        Icon(painter = painterResource(id = if (isPinned) R.drawable.unpin else R.drawable.pin),tint = Color.White, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(
+                            painter = painterResource(id = if (isPinned) R.drawable.unpin else R.drawable.pin),
+                            tint = Color.White,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(Modifier.width(6.dp))
                         Text(if (isPinned) "Unpin" else "Pin to top")
                     }
@@ -120,7 +125,12 @@ fun ServerScreen(onNavigateToChannels: (guildId: String, guildName: String) -> U
                         modifier = Modifier.fillMaxWidth().height(36.dp),
                         colors = ButtonDefaults.filledTonalButtonColors()
                     ) {
-                        Icon(painter = painterResource(id = if (isHidden) R.drawable.unhide else R.drawable.hide), tint = Color.White, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(
+                            painter = painterResource(id = if (isHidden) R.drawable.unhide else R.drawable.hide),
+                            tint = Color.White,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(Modifier.width(6.dp))
                         Text(if (isHidden) "Unhide" else "Hide")
                     }
@@ -152,7 +162,10 @@ fun ServerScreen(onNavigateToChannels: (guildId: String, guildName: String) -> U
                 items(serverPings.size) { index ->
                     val ping = serverPings[index]
                     ServerPingCard(ping = ping, onClick = {
-                        onNavigateToChannels(ping.message.guildId ?: return@ServerPingCard, ping.guildName ?: return@ServerPingCard)
+                        onNavigateToChannels(
+                            ping.message.guildId ?: return@ServerPingCard,
+                            ping.guildName ?: return@ServerPingCard
+                        )
                     })
                 }
             }
@@ -246,7 +259,12 @@ private fun ServerButton(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (isPinned) Icon(painter = painterResource(id = R.drawable.pin),tint = Color.White, contentDescription = "Pinned", modifier = Modifier.size(10.dp))
+            if (isPinned) Icon(
+                painter = painterResource(id = R.drawable.pin),
+                tint = Color.White,
+                contentDescription = "Pinned",
+                modifier = Modifier.size(10.dp)
+            )
 
             if (iconUrl != null && !isHidden) {
                 AsyncImage(
@@ -287,21 +305,22 @@ private fun ServerButton(
             )
         }
 
-        // Red mention badge — top-right corner of the button
+        // Red mention badge vertically centered with the server name
+        //
         if (mentionCount > 0 && !isHidden) {
             Box(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 4.dp, end = 6.dp)
-                    .defaultMinSize(minWidth = 16.dp, minHeight = 16.dp)
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 6.dp)
+                    .defaultMinSize(minWidth = 20.dp, minHeight = 20.dp)
                     .background(Color(0xFFF23F43), CircleShape)
-                    .padding(horizontal = 3.dp),
+                    .padding(horizontal = 5.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = if (mentionCount > 99) "99+" else mentionCount.toString(),
                     color = Color.White,
-                    fontSize = 8.sp,
+                    fontSize = 10.sp,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                 )
             }

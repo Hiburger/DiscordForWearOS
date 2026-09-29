@@ -90,38 +90,35 @@ fun EmojiStickerScreen(
             if (loading) {
                 item { CircularProgressIndicator() }
             } else if (tab == 0 || reactMode) {
-                if (reactMode) {
-                    val unicodeRows = COMMON_UNICODE_EMOJI.chunked(6)
-                    items(unicodeRows.size) { rowIdx ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            unicodeRows[rowIdx].forEach { emoji ->
-                                Text(
-                                    text = emoji,
-                                    fontSize = 20.sp,
-                                    modifier = Modifier
-                                        .clickable { onUnicodeEmojiPicked(emoji) }
-                                        .padding(4.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    if (emojis.isNotEmpty()) {
-                        item {
+                val unicodeRows = COMMON_UNICODE_EMOJI.chunked(6)
+                items(unicodeRows.size) { rowIdx ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        unicodeRows[rowIdx].forEach { emoji ->
                             Text(
-                                "Server Emojis",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                                text = emoji,
+                                fontSize = 20.sp,
+                                modifier = Modifier
+                                    .clickable { onUnicodeEmojiPicked(emoji) }
+                                    .padding(4.dp)
                             )
                         }
                     }
                 }
-                if (emojis.isEmpty() && !reactMode) {
+
+                if (emojis.isNotEmpty()) {
+                    item {
+                        Text(
+                            "Server Emojis",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                        )
+                    }
+                } else if (!reactMode) {
                     item {
                         Text(
                             "No custom emojis.",
@@ -130,7 +127,8 @@ fun EmojiStickerScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
-                } else if (emojis.isNotEmpty()) {
+                }
+                if (emojis.isNotEmpty()) {
                     val rows = emojis.chunked(4)
                     items(rows.size) { rowIdx ->
                         Row(
