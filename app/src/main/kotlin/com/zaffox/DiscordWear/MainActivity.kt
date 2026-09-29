@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -205,11 +206,12 @@ class MainActivity : ComponentActivity() {
                             val tab = back.arguments?.getString("tab")?.toIntOrNull() ?: 0
                             val reactMsgId = back.arguments?.getString("react")
                             val repo = discordApp.repository ?: return@composable
+                            val currentUser by repo.currentUser.collectAsState()
                             val scope = rememberCoroutineScope()
                             EmojiStickerScreen(
                                 tab = tab,
                                 guildId = guildId,
-                                hasNitro = repo.currentUser.value?.hasNitro ?: false,
+                                hasNitro = currentUser?.hasNitro ?: false,
                                 sendAnimatedAsGif = SetupPreferences.getSendAnimatedAsGif(applicationContext),
                                 reactMode = reactMsgId != null,
                                 onEmojiPicked = { insertText ->
@@ -317,14 +319,16 @@ class MainActivity : ComponentActivity() {
                             val msgId = back.arguments?.getString("msgId") ?: return@composable
                             val repo = discordApp.repository ?: return@composable
                             val scope = rememberCoroutineScope()
-                            val msg = repo.messages.value[channelId]?.firstOrNull { it.id == msgId }
+                            val messages by repo.messages.collectAsState()
+                            val currentUser by repo.currentUser.collectAsState()
+                            val msg = messages[channelId]?.firstOrNull { it.id == msgId }
                             LaunchedEffect(Unit) {
                                 if (msg == null) navController.popBackStack()
                             }
                             if (msg != null) {
                                 MessageOptionsScreen(
                                     msg = msg,
-                                    isOwn = msg.author.id == repo.currentUser.value?.id,
+                                    isOwn = msg.author.id == currentUser?.id,
                                     channelId = channelId,
                                     onReply = {
                                         navController.previousBackStackEntry?.savedStateHandle
@@ -355,7 +359,8 @@ class MainActivity : ComponentActivity() {
                             val channelId = back.arguments?.getString("channelId") ?: return@composable
                             val msgId = back.arguments?.getString("msgId") ?: return@composable
                             val repo = discordApp.repository ?: return@composable
-                            val msg = repo.messages.value[channelId]?.firstOrNull { it.id == msgId }
+                            val messages by repo.messages.collectAsState()
+                            val msg = messages[channelId]?.firstOrNull { it.id == msgId }
                             LaunchedEffect(Unit) {
                                 if (msg == null) navController.popBackStack()
                             }
