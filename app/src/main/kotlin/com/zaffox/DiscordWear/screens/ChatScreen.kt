@@ -280,6 +280,7 @@ fun ChatScreen(
             startRecording()
         }
         navEntry?.savedStateHandle?.remove<String>("replyToId")?.let { replyToId = it }
+        navEntry?.savedStateHandle?.remove<String>("actionError")?.let { sendError = it }
     }
 
     if (loading) {
@@ -1573,10 +1574,11 @@ internal fun ComposeActionsScreen(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    var permError by remember { mutableStateOf("") }
     val imagePermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) onOpenPhoto()
+        if (granted) onOpenPhoto() else permError = "Photo permission denied"
     }
     BackHandler(onBack = onDismiss)
     Box(modifier = Modifier.fillMaxSize()) {
@@ -1670,6 +1672,18 @@ internal fun ComposeActionsScreen(
                     }
                     Text("Voice", style = MaterialTheme.typography.labelSmall)
                 }
+            }
+            if (permError.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    permError,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.labelSmall,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { permError = "" }
+                )
             }
         }
     }

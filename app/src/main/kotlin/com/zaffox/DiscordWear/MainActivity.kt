@@ -227,8 +227,12 @@ class MainActivity : ComponentActivity() {
                                     } else if (insertText.startsWith("<a:") && SetupPreferences.getSendAnimatedAsGif(applicationContext)) {
                                         scope.launch {
                                             repo.sendMessage(channelId, buildEmojiLink(insertText))
+                                                .onFailure {
+                                                    navController.previousBackStackEntry?.savedStateHandle
+                                                        ?.set("actionError", "Failed: ${it.message}")
+                                                }
+                                            navController.popBackStack()
                                         }
-                                        navController.popBackStack()
                                     } else {
                                         navController.previousBackStackEntry?.savedStateHandle
                                             ?.set("insertEmoji", insertText)
@@ -254,8 +258,12 @@ class MainActivity : ComponentActivity() {
                                 onStickerPicked = { stickerId ->
                                     scope.launch {
                                         repo.sendSticker(channelId, stickerId)
+                                            .onFailure {
+                                                navController.previousBackStackEntry?.savedStateHandle
+                                                    ?.set("actionError", "Failed: ${it.message}")
+                                            }
+                                        navController.popBackStack()
                                     }
-                                    navController.popBackStack()
                                 }
                             )
                         }
