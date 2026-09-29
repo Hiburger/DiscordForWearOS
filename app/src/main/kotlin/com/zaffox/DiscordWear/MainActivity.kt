@@ -208,6 +208,7 @@ class MainActivity : ComponentActivity() {
                             val repo = discordApp.repository ?: return@composable
                             val currentUser by repo.currentUser.collectAsState()
                             val scope = rememberCoroutineScope()
+                            var sending by remember { mutableStateOf(false) }
                             EmojiStickerScreen(
                                 tab = tab,
                                 guildId = guildId,
@@ -225,13 +226,17 @@ class MainActivity : ComponentActivity() {
                                         }
                                         navController.popBackStack()
                                     } else if (insertText.startsWith("<a:") && SetupPreferences.getSendAnimatedAsGif(applicationContext)) {
-                                        scope.launch {
-                                            repo.sendMessage(channelId, buildEmojiLink(insertText))
-                                                .onFailure {
-                                                    navController.previousBackStackEntry?.savedStateHandle
-                                                        ?.set("actionError", "Failed: ${it.message}")
-                                                }
-                                            navController.popBackStack()
+                                        // picker stays open until the send completes; ignore extra taps
+                                        if (!sending) {
+                                            sending = true
+                                            scope.launch {
+                                                repo.sendMessage(channelId, buildEmojiLink(insertText))
+                                                    .onFailure {
+                                                        navController.previousBackStackEntry?.savedStateHandle
+                                                            ?.set("actionError", "Failed: ${it.message}")
+                                                    }
+                                                navController.popBackStack()
+                                            }
                                         }
                                     } else {
                                         navController.previousBackStackEntry?.savedStateHandle
@@ -256,13 +261,17 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 onStickerPicked = { stickerId ->
-                                    scope.launch {
-                                        repo.sendSticker(channelId, stickerId)
-                                            .onFailure {
-                                                navController.previousBackStackEntry?.savedStateHandle
-                                                    ?.set("actionError", "Failed: ${it.message}")
-                                            }
-                                        navController.popBackStack()
+                                    // picker stays open until the send completes; ignore extra taps
+                                    if (!sending) {
+                                        sending = true
+                                        scope.launch {
+                                            repo.sendSticker(channelId, stickerId)
+                                                .onFailure {
+                                                    navController.previousBackStackEntry?.savedStateHandle
+                                                        ?.set("actionError", "Failed: ${it.message}")
+                                                }
+                                            navController.popBackStack()
+                                        }
                                     }
                                 }
                             )
@@ -330,7 +339,9 @@ class MainActivity : ComponentActivity() {
                             val messages by repo.messages.collectAsState()
                             val currentUser by repo.currentUser.collectAsState()
                             val msg = messages[channelId]?.firstOrNull { it.id == msgId }
-                            LaunchedEffect(Unit) {
+                            // keyed on msg: if the message is deleted while the
+                            // options are open, pop back instead of showing a blank screen
+                            LaunchedEffect(msg) {
                                 if (msg == null) navController.popBackStack()
                             }
                             if (msg != null) {
@@ -369,7 +380,7 @@ class MainActivity : ComponentActivity() {
                             val repo = discordApp.repository ?: return@composable
                             val messages by repo.messages.collectAsState()
                             val msg = messages[channelId]?.firstOrNull { it.id == msgId }
-                            LaunchedEffect(Unit) {
+                            LaunchedEffect(msg) {
                                 if (msg == null) navController.popBackStack()
                             }
                             if (msg != null) {
