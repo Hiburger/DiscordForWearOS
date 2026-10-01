@@ -2,7 +2,7 @@ package com.zaffox.discordwear
 
 import android.app.Application
 import com.zaffox.discordwear.api.DiscordRepository
-import com.zaffox.discordwear.api.newLaunchSignature
+import com.zaffox.discordwear.api.ClientUniqueMetadata
 
 class DiscordWearApp : Application() {
     var repository: DiscordRepository? = null
@@ -10,7 +10,7 @@ class DiscordWearApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        newLaunchSignature()
+        ClientUniqueMetadata.newLaunchSignature()
         UpdateChecker.start(this)
     }
 
