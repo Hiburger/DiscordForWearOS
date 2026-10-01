@@ -26,6 +26,6 @@ object ClientUniqueMetadata {
         val signature = result.toString()
         currentLaunchSignature = signature
 
-        return signature
+        //return signature
     }
 }
