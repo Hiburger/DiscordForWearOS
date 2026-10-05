@@ -15,8 +15,6 @@ import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.*
 import coil.ImageLoader
 import coil.compose.AsyncImage
-import coil.decode.GifDecoder
-import coil.decode.ImageDecoderDecoder
 import coil.request.ImageRequest
 import com.zaffox.discordwear.api.GuildEmoji
 import com.zaffox.discordwear.api.StickerItem
@@ -48,15 +46,7 @@ fun EmojiStickerScreen(
     val listState = rememberScalingLazyListState()
     val scope = rememberCoroutineScope()
 
-    val imageLoader = remember {
-        ImageLoader.Builder(context)
-            .components {
-                if (android.os.Build.VERSION.SDK_INT >= 28)
-                    add(ImageDecoderDecoder.Factory())
-                else
-                    add(GifDecoder.Factory())
-            }.build()
-    }
+    val imageLoader = context.discordApp.imageLoader
 
     var emojis by remember { mutableStateOf<List<GuildEmoji>>(emptyList()) }
     var stickers by remember { mutableStateOf<List<StickerItem>>(emptyList()) }

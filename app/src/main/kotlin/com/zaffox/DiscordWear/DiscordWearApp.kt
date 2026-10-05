@@ -1,11 +1,26 @@
 package com.zaffox.discordwear
 
 import android.app.Application
+import coil.ImageLoader
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
 import com.zaffox.discordwear.api.DiscordRepository
 
 class DiscordWearApp : Application() {
     var repository: DiscordRepository? = null
         private set
+
+    // One shared image loader for the whole app so memory/disk caches are shared across screens
+    val imageLoader: ImageLoader by lazy {
+        ImageLoader.Builder(this)
+            .components {
+                if (android.os.Build.VERSION.SDK_INT >= 28)
+                    add(ImageDecoderDecoder.Factory())
+                else
+                    add(GifDecoder.Factory())
+            }
+            .build()
+    }
 
     override fun onCreate() {
         super.onCreate()

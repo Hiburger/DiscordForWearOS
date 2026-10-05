@@ -42,8 +42,6 @@ import androidx.wear.compose.material3.*
 import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
-import coil.decode.GifDecoder
-import coil.decode.ImageDecoderDecoder
 import coil.request.ImageRequest
 import android.content.Context
 import android.media.MediaPlayer
@@ -82,15 +80,7 @@ fun ChatScreen(
     val listState = rememberScalingLazyListState()
     val scope = rememberCoroutineScope()
     val keyboardController = LocalSoftwareKeyboardController.current
-    val imageLoader = remember {
-        ImageLoader.Builder(context)
-            .components {
-                if (android.os.Build.VERSION.SDK_INT >= 28)
-                    add(ImageDecoderDecoder.Factory())
-                else
-                    add(GifDecoder.Factory())
-            }.build()
-    }
+    val imageLoader = context.discordApp.imageLoader
 
     val allMessages by (repo?.messages ?: return).collectAsState()
     val messages = allMessages[channelId].orEmpty()

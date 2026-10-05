@@ -30,10 +30,7 @@ import androidx.wear.compose.material3.TimeText
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
-import coil.ImageLoader
 import com.zaffox.discordwear.api.*
-import coil.decode.GifDecoder
-import coil.decode.ImageDecoderDecoder
 import com.zaffox.discordwear.screens.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -284,15 +281,7 @@ class MainActivity : ComponentActivity() {
                             var uploadError by remember { mutableStateOf("") }
                             Box(modifier = Modifier.fillMaxSize()) {
                                 PhotoPickerScreen(
-                                    imageLoader = remember {
-                                        ImageLoader.Builder(applicationContext)
-                                            .components {
-                                                if (Build.VERSION.SDK_INT >= 28)
-                                                    add(ImageDecoderDecoder.Factory())
-                                                else
-                                                    add(GifDecoder.Factory())
-                                            }.build()
-                                    },
+                                    imageLoader = applicationContext.discordApp.imageLoader,
                                     onImageSelected = { uri, mime ->
                                         scope.launch {
                                             runCatching {

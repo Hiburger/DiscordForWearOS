@@ -170,6 +170,28 @@ object SetupPreferences {
         return hidden
     }
 
+    private const val KEY_PINNED_DMS = "pinned_dms"
+
+    fun getPinnedDms(context: Context): Set<String> =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getStringSet(KEY_PINNED_DMS, emptySet()) ?: emptySet()
+
+    fun setPinnedDms(context: Context, ids: Set<String>) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit { putStringSet(KEY_PINNED_DMS, ids) }
+    }
+
+    fun togglePinnedDm(context: Context, channelId: String): Boolean {
+        val current = getPinnedDms(context).toMutableSet()
+        val pinned = if (current.contains(channelId)) {
+            current.remove(channelId); false
+        } else {
+            current.add(channelId); true
+        }
+        setPinnedDms(context, current)
+        return pinned
+    }
+
     fun clearDiscordCache(context: Context) {
         val cache = context.getSharedPreferences("discord_wear_cache", Context.MODE_PRIVATE)
         cache.edit { clear() }

@@ -39,7 +39,7 @@ fun ServerScreen(onNavigateToChannels: (guildId: String, guildName: String) -> U
     val listState = rememberScalingLazyListState()
     val menuState = rememberScalingLazyListState()
     val scope = rememberCoroutineScope()
-    val imageLoader = remember { ImageLoader.Builder(context).build() }
+    val imageLoader = context.discordApp.imageLoader
 
     val guilds by (repo?.guilds ?: return).collectAsState()
     val pings by repo.pings.collectAsState()

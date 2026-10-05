@@ -40,7 +40,7 @@ fun DmsScreen(
     val repo = context.discordApp.repository
     val listState = rememberScalingLazyListState()
     val scope = rememberCoroutineScope()
-    val imageLoader = remember { ImageLoader.Builder(context).build() }
+    val imageLoader = context.discordApp.imageLoader
 
     if (repo == null) return
     val dmChannels by repo.dmChannels.collectAsState()
@@ -48,6 +48,7 @@ fun DmsScreen(
     val readState by repo.readState.collectAsState()
     val showBadges = remember { SetupPreferences.getShowMentionBadges(context) }
     var loading by remember { mutableStateOf(dmChannels.isEmpty()) }
+    var pinnedIds by remember { mutableStateOf(SetupPreferences.getPinnedDms(context)) }
     var hiddenIds by remember { mutableStateOf(SetupPreferences.getHiddenDms(context)) }
     var showHidden by remember { mutableStateOf(false) }
     var menuDm by remember { mutableStateOf<Channel?>(null) }
@@ -61,14 +62,18 @@ fun DmsScreen(
         }
     }
 
-    val sortedDms = remember(dmChannels, hiddenIds, showHidden) {
+    val sortedDms = remember(dmChannels, pinnedIds, hiddenIds, showHidden) {
         dmChannels
             .filter { showHidden || !hiddenIds.contains(it.id) }
-            .sortedByDescending { it.lastMessageId?.toLongOrNull() ?: 0L }
+            .sortedWith(
+                compareByDescending<Channel> { pinnedIds.contains(it.id) }
+                    .thenByDescending { it.lastMessageId?.toLongOrNull() ?: 0L }
+            )
     }
 
     val activeDm = menuDm
     if (activeDm != null) {
+        val isPinnedMenu = pinnedIds.contains(activeDm.id)
         val isHiddenMenu = hiddenIds.contains(activeDm.id)
         ScreenScaffold(scrollState = menuState) {
             ScalingLazyColumn(state = menuState, modifier = Modifier.fillMaxSize()) {
@@ -80,6 +85,26 @@ fun DmsScreen(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.fillMaxWidth()
                     )
+                }
+                item {
+                    Button(
+                        onClick = {
+                            SetupPreferences.togglePinnedDm(context, activeDm.id)
+                            pinnedIds = SetupPreferences.getPinnedDms(context)
+                            menuDm = null
+                        },
+                        modifier = Modifier.fillMaxWidth().height(36.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors()
+                    ) {
+                        Icon(
+                            painter = painterResource(id = if (isPinnedMenu) R.drawable.unpin else R.drawable.pin),
+                            tint = Color.White,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (isPinnedMenu) "Unpin" else "Pin to top")
+                    }
                 }
                 item {
                     Button(
@@ -156,6 +181,7 @@ fun DmsScreen(
                             dm.lastMessageId > rs.lastMessageId
                         },
                         isHidden = isHidden,
+                        isPinned = pinnedIds.contains(dm.id),
                         onClick = { if (!isHidden) onNavigateToChatScreen(dm.id, dm.displayName) },
                         onLongClick = { menuDm = dm }
                     )
@@ -188,6 +214,20 @@ private fun OnlineStatus.dotColor(): Color = when (this) {
     OnlineStatus.OFFLINE -> Color(0xFF80848E)
 }
 
+// Stable across recompositions: building the request inline makes Coil restart
+// the load every time the list recomposes (e.g. on presence updates)
+@Composable
+private fun rememberedRequest(url: String?, crossfade: Boolean = true): ImageRequest? {
+    if (url == null) return null
+    val context = LocalContext.current
+    return remember(url, crossfade) {
+        ImageRequest.Builder(context)
+            .data(url)
+            .crossfade(crossfade)
+            .build()
+    }
+}
+
 private fun OnlineStatus.label(): String = when (this) {
     OnlineStatus.ONLINE -> "Online"
     OnlineStatus.IDLE -> "Idle"
@@ -206,10 +246,10 @@ private fun DmButton(
     mentionCount: Int = 0,
     hasUnread: Boolean = false,
     isHidden: Boolean = false,
+    isPinned: Boolean = false,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
-    val context = LocalContext.current
     val avatarUrl = recipient?.avatarUrl(64)
     val nameplateUrl = recipient?.nameplateUrl()
     val status = presence?.status ?: OnlineStatus.OFFLINE
@@ -225,7 +265,7 @@ private fun DmButton(
     ) {
         if (backgroundUrl != null && !isHidden) {
             SubcomposeAsyncImage(
-                model = ImageRequest.Builder(context).data(backgroundUrl).crossfade(true).build(),
+                model = rememberedRequest(backgroundUrl),
                 imageLoader = imageLoader,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
@@ -266,7 +306,7 @@ private fun DmButton(
                     val avatarAlpha = if (isHidden) 0.38f else 1f
                     if (avatarUrl != null && !isHidden) {
                         SubcomposeAsyncImage(
-                            model = ImageRequest.Builder(context).data(avatarUrl).crossfade(true).build(),
+                            model = rememberedRequest(avatarUrl),
                             imageLoader = imageLoader,
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
@@ -296,7 +336,7 @@ private fun DmButton(
                     val decorUrl = recipient?.avatarDecorationUrl()
                     if (decorUrl != null && !isHidden) {
                         SubcomposeAsyncImage(
-                            model = ImageRequest.Builder(context).data(decorUrl).crossfade(false).build(),
+                            model = rememberedRequest(decorUrl, crossfade = false),
                             imageLoader = imageLoader,
                             contentDescription = null,
                             contentScale = ContentScale.Fit,
@@ -342,6 +382,12 @@ private fun DmButton(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    if (isPinned) Icon(
+                        painter = painterResource(id = R.drawable.pin),
+                        tint = nameColor,
+                        contentDescription = "Pinned",
+                        modifier = Modifier.size(10.dp)
+                    )
                     Text(
                         text = dm.displayName,
                         style = MaterialTheme.typography.bodySmall,
@@ -370,7 +416,7 @@ private fun DmButton(
                             if (customEmoji != null) {
                                 if (customEmoji.startsWith("http")) {
                                     SubcomposeAsyncImage(
-                                        model = ImageRequest.Builder(context).data(customEmoji).crossfade(true).build(),
+                                        model = rememberedRequest(customEmoji),
                                         imageLoader = imageLoader,
                                         contentDescription = null,
                                         modifier = Modifier.size(12.dp)

@@ -36,7 +36,7 @@ fun UserProfileScreen(
     val repo = context.discordApp.repository
     val scope = rememberCoroutineScope()
     val listState = rememberScalingLazyListState()
-    val imageLoader = remember { ImageLoader.Builder(context).build() }
+    val imageLoader = context.discordApp.imageLoader
     var user by remember { mutableStateOf(initialUser) }
     var loading by remember { mutableStateOf(initialUser == null) }
     var dmLoading by remember { mutableStateOf(false) }
