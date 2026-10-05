@@ -6,7 +6,7 @@
 
 Hi ! This is an unofficial, open-source Discord client for your Wear OS watch built and tested for **Pixel Watch** and **Galaxy Watch** (but should run on any modern WearOS).
 
-This is a maintained fork of [Zaffox/Discord-WearOS](https://github.com/Zaffox/Discord-WearOS) on GitHub, kept alive after the original project went inactive. The assets and most of the code are from that repo.
+This is a fork of [Zaffox/Discord-WearOS](https://github.com/Zaffox/Discord-WearOS) on GitHub, kept alive after the original project went inactive (and.... it's back now!). The assets and most of the code are from that repo.
 
 | Home | Servers | DMs |
 |:---:|:---:|:---:|
