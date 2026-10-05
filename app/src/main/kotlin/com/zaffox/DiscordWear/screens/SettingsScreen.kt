@@ -1,5 +1,7 @@
 package com.zaffox.discordwear.screens
 
+import android.app.Activity
+import android.view.WindowManager
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.*
@@ -31,6 +33,13 @@ fun SettingsScreen(
     var downloading by remember { mutableStateOf(false) }
     var downloadProgress by remember { mutableStateOf(0f) }
     var downloadError by remember { mutableStateOf("") }
+
+    // Keep the screen on while the update downloads so the watch doesn't sleep mid-transfer
+    DisposableEffect(downloading) {
+        val window = (context as? Activity)?.window
+        if (downloading) window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    }
 
 
     var sendAnimatedAsGif by remember {
