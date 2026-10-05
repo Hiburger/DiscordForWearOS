@@ -105,6 +105,16 @@ cd DiscordForWearOS
 
 Release builds need a keystore, provided via environment variables (see `app/build.gradle`)
 
+## Contributors & stargazers :)
+
+GitHub doesn't show contributors on forks, so here they are !
+
+<a href="https://github.com/Hiburger/DiscordForWearOS/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=Hiburger/DiscordForWearOS" alt="Contributors" />
+</a>
+
+[![GitHub Stars](https://img.shields.io/github/stars/Hiburger/DiscordForWearOS?style=social&label=Stars)](https://github.com/Hiburger/DiscordForWearOS/stargazers)
+
 ## Credits :)
 
 - Original project: [Zaffox/Discord-WearOS](https://github.com/Zaffox/Discord-WearOS) // huge thanks to [@Zaffox](https://github.com/Zaffox) for creating it
