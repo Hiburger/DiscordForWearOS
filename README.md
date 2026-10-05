@@ -105,7 +105,7 @@ cd DiscordForWearOS
 
 Release builds need a keystore, provided via environment variables (see `app/build.gradle`)
 
-## Contributors & stargazers :)
+## Contributors :)
 
 GitHub doesn't show contributors on forks, so here they are !
 
