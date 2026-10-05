@@ -3,8 +3,7 @@ package com.zaffox.discordwear.api
 import java.util.UUID
 
 object ClientUniqueMetadata {
-    var currentLaunchSignature: String = ""
-        private set
+    val currentLaunchSignature: String = newLaunchSignature()
 
     fun newLaunchSignature(): String {
         val bits =
@@ -23,9 +22,6 @@ object ClientUniqueMetadata {
             low.toLong()
         )
 
-        val signature = result.toString()
-        currentLaunchSignature = signature
-
-        return signature
+        return result.toString()
     }
 }
