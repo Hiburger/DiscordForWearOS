@@ -33,6 +33,7 @@ object DiscordHttp {
             .put("mp_keyword_current", "discord")
             .put("release_channel", "stable")
             .put("client_build_number", 396858)
+            .put("launch_signature", ClientUniqueMetadata.currentLaunchSignature)
             .put("client_event_source", JSONObject.NULL)
             .put("has_client_mods", false)
             .toString()
