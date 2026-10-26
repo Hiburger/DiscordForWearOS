@@ -44,7 +44,7 @@ class CaptchaWebServer(
         return addresses
     }
 
-    // I hate captchas too. Really.
+    // I hate captchas.
 
     fun start() {
         if (running) return

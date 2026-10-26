@@ -200,7 +200,7 @@ class RemoteAuthClient(
         val ticket = pendingTicket
         val captcha = pendingCaptcha
         if (ticket.isNullOrBlank() || captcha == null) {
-            log("No pending captcha challenge to retry!")
+            log("No pending captcha test to retry!")
             setState(RemoteAuthState.Error("Captcha session expired: pls get a new QR code"))
             return
         }

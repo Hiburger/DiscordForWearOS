@@ -15,6 +15,8 @@ object SetupPreferences {
     private const val KEY_NOTIF_MENTIONS = "notifications_mentions"
     private const val KEY_MOCK_MODE = "mock_mode"
 
+    // some fun.... (pun intented)
+
     fun saveToken(context: Context, token: String) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit { putString(KEY_TOKEN, token) }
