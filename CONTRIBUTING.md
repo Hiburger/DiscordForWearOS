@@ -21,7 +21,7 @@ The commands that matter:
 
 ## Project map
 
-Everything lives in `app/src/main/kotlin/com/zaffox/DiscordWear/`:
+Everything lives in `app/src/main/kotlin/com/hiburger/discordwear/`:
 
 - `api/` - the Discord layer: `DiscordGateway` (websocket), `DiscordHttp` / `DiscordRestClient` (REST), `DiscordRepository` (state, what the UI collects)
 - `screens/` - Compose UI, one file per screen (`ChatScreen`, `DmsScreen`, `ServerScreen`, ...)
