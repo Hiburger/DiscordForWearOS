@@ -15,6 +15,7 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyListScope
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.*
 import com.hiburger.discordwear.ApkInstaller
+import com.hiburger.discordwear.NotificationService
 import com.hiburger.discordwear.SetupPreferences
 import com.hiburger.discordwear.UpdateChecker
 import com.hiburger.discordwear.discordApp
@@ -203,6 +204,13 @@ fun SettingsScreen(
                     onCheckedChange = {
                         notificationsEnabled = it
                         SetupPreferences.setNotificationsEnabled(context, it)
+                        // No alerts wanted -> no reason to keep the gateway
+                        // service (and its websocket) alive in the background.
+                        if (it) {
+                            if (SetupPreferences.getToken(context) != null) NotificationService.start(context)
+                        } else {
+                            NotificationService.stop(context)
+                        }
                     },
                     label = { Text("New message alerts", style = MaterialTheme.typography.bodySmall) }
                 )

@@ -61,9 +61,10 @@ class MainActivity : ComponentActivity() {
         }
         val mock = BuildConfig.DEBUG && SetupPreferences.isMockMode(this)
         val token = SetupPreferences.getToken(this)
+        val existingRepo = discordApp.repository
         when {
-            mock -> discordApp.initMockRepository()
-            token != null -> discordApp.initRepository(token)
+            mock -> if (existingRepo?.mock != true) discordApp.initMockRepository()
+            token != null -> if (existingRepo == null || existingRepo.mock) discordApp.initRepository(token)
         }
 
         consumeIntentExtras(intent)
@@ -137,7 +138,7 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable("chatscreen/{channelId}/{channelName}/{guildId}") { back ->
-                            val channelId = back.arguments?.getString("channelId")   ?: return@composable
+                            val channelId = back.arguments?.getString("channelId") ?: return@composable
                             val channelName = back.arguments?.getString("channelName") ?: channelId
                             val guildIdArg = back.arguments?.getString("guildId")
                             val guildId = if (guildIdArg == "dm") null else guildIdArg
@@ -222,7 +223,10 @@ class MainActivity : ComponentActivity() {
                                             }
                                         }
                                         navController.popBackStack()
-                                    } else if (insertText.startsWith("<a:") && SetupPreferences.getSendAnimatedAsGif(applicationContext)) {
+                                    } else if (insertText.startsWith("<a:") && SetupPreferences.getSendAnimatedAsGif(
+                                            applicationContext
+                                        )
+                                    ) {
                                         // picker stays open until the send completes; ignore extra taps
                                         if (!sending) {
                                             sending = true
@@ -399,7 +403,7 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable("ServerChannels/{guildId}/{guildName}") { back ->
-                            val guildId = back.arguments?.getString("guildId")   ?: return@composable
+                            val guildId = back.arguments?.getString("guildId") ?: return@composable
                             val guildName = back.arguments?.getString("guildName") ?: guildId
                             activeChannelId = null
                             discordApp.repository?.suppressNotificationsFor = null
@@ -475,7 +479,7 @@ class MainActivity : ComponentActivity() {
     private fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED
+            != PackageManager.PERMISSION_GRANTED
         ) {
             notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }

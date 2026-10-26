@@ -18,10 +18,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
-/**
- * Foreground service that keeps the Discord gateway alive while the app is
- * closed and raises Wear OS notifications for new DMs and mentions.
- */
+
+// better foreground service that keeps the Discord gateway alive while the app is closed and raises Wear OS notifications for new DMs and mentions
+
 class NotificationService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -40,7 +39,7 @@ class NotificationService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // (Re)connect the repository if the process was restarted by the system
+        // (Re)connect the repo if the process was restarted by the system
         if (discordApp.repository == null) {
             SetupPreferences.getToken(this)?.let { token ->
                 discordApp.initRepository(token)
@@ -52,7 +51,7 @@ class NotificationService : Service() {
             buildPersistentNotification(),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
         )
-        // Repository may have just been created; (re)start observing
+        // (re)start observing (useful in some cases)
         observeNotifications()
         return START_STICKY
     }
@@ -158,6 +157,7 @@ class NotificationService : Service() {
         private const val PERSISTENT_ID = 42
 
         fun start(context: android.content.Context) {
+            if (!SetupPreferences.isNotificationsEnabled(context)) return
             if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
             val intent = Intent(context, NotificationService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
