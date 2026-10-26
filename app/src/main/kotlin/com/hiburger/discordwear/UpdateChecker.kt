@@ -43,7 +43,10 @@ object UpdateChecker {
     private const val KEY_LATEST_HTML = "latest_html_url"
     private const val KEY_LATEST_NAME = "latest_release_name"
     private const val KEY_NOTIFIED_TAG = "notified_tag"
+    private const val KEY_LAST_ATTEMPT = "last_attempt_ms"
+    private const val KEY_LAST_FAILED = "last_attempt_failed"
     private const val CHECK_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000L
+    private const val RETRY_INTERVAL_MS = 60 * 60 * 1000L
     private const val CHANNEL_UPDATES = "app_updates"
     private const val UPDATE_NOTIF_ID = 43
 
@@ -75,9 +78,12 @@ object UpdateChecker {
             val appContext = context.applicationContext
             while (true) {
                 val prefs = prefs(appContext)
-                val lastCheckMs = prefs.getLong(KEY_LAST_CHECK, 0L)
+                val lastAttemptMs = prefs.getLong(KEY_LAST_ATTEMPT, 0L)
+                val interval =
+                    if (prefs.getBoolean(KEY_LAST_FAILED, false)) RETRY_INTERVAL_MS
+                    else CHECK_INTERVAL_MS
                 val nowMs = System.currentTimeMillis()
-                val dueMs = (lastCheckMs + CHECK_INTERVAL_MS - nowMs).coerceAtLeast(0L)
+                val dueMs = (lastAttemptMs + interval - nowMs).coerceAtLeast(0L)
 
                 if (dueMs > 0) delay(dueMs)
 
@@ -111,7 +117,7 @@ object UpdateChecker {
 
     private suspend fun check(context: Context) {
         _state.value = UpdateState.Checking
-        runCatching {
+        val result = runCatching {
             val request = Request.Builder()
                 .url(API_URL)
                 .header("Accept", "application/vnd.github+json")
@@ -154,7 +160,7 @@ object UpdateChecker {
             else
                 UpdateState.UpToDate
 
-            // Notif once per new release
+            // notif once per new release
             if (isUpdate && prefs(context).getString(KEY_NOTIFIED_TAG, null) != tag) {
                 notifyNewVersion(context, release)
                 prefs(context).edit().putString(KEY_NOTIFIED_TAG, tag).apply()
@@ -162,6 +168,13 @@ object UpdateChecker {
         }.onFailure { e ->
             _state.value = UpdateState.Error(e.message ?: "Unknown error")
         }
+
+        // Record every attempt (success or failure) so the start() loop knows
+        // how long to wait before the next one.
+        prefs(context).edit()
+            .putLong(KEY_LAST_ATTEMPT, System.currentTimeMillis())
+            .putBoolean(KEY_LAST_FAILED, result.isFailure)
+            .apply()
     }
 
     private fun notifyNewVersion(context: Context, release: ReleaseInfo) {
