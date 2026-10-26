@@ -1,8 +1,14 @@
-# DiscordWear
+<p align="center">
+  <img src="DiscordWear.png" width="200" alt="DiscordWear logo"/>
+</p>
 
-[![Build DiscordWear beta](https://github.com/Hiburger/DiscordForWearOS/actions/workflows/build_Discord_Wear.yml/badge.svg)](https://github.com/Hiburger/DiscordForWearOS/actions/workflows/build_Discord_Wear.yml)
-[![License: GPL-3.0](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-![install](https://img.shields.io/badge/only_installable_by_smelly_nerds-yes-red)
+<h1 align="center">DiscordWear</h1>
+
+<p align="center">
+  <a href="https://github.com/Hiburger/DiscordForWearOS/actions/workflows/build_Discord_Wear.yml"><img alt="Build DiscordWear beta" src="https://github.com/Hiburger/DiscordForWearOS/actions/workflows/build_Discord_Wear.yml/badge.svg"/></a>
+  <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/License-GPLv3-blue.svg"/></a>
+  <img alt="install" src="https://img.shields.io/badge/only_installable_by_smelly_nerds-yes-red"/>
+</p>
 
 Hi ! This is an unofficial, open-source Discord client for your Wear OS watch built and tested for **Pixel Watch** and **Galaxy Watch** (but should run on any modern WearOS).
 
@@ -53,7 +59,7 @@ You need the [Android platform-tools](https://developer.android.com/tools/releas
    adb install -r /Downloads/DiscordWear.apk
    ```
 
-Ports and codes expire after a couple of minutes... if a step fails, just generate fresh ones and retry quickly. If `adb install` complains about signatures (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`), uninstall first (`adb uninstall com.zaffox.discordwear`), knowing you will have to log in again
+Ports and codes expire after a couple of minutes... if a step fails, just generate fresh ones and retry quickly. If `adb install` complains about signatures (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`), uninstall first (`adb uninstall com.hiburger.discordwear`, or `adb uninstall com.zaffox.discordwear` if you still have a pre-1.7.3 install), knowing you will have to log in again
 
 #### adb not cooperating ? Check this first
 
@@ -71,6 +77,8 @@ Ports and codes expire after a couple of minutes... if a step fails, just genera
 > If you have the original app installed, you **must uninstall it first** !
 >
 > This fork is signed with a different key, so installing over the original fails (with the following unclear error: "App not installed"). You will need to log in again after installing.
+>
+> **Updating from 1.7.2 or older?** The app package changed from `com.zaffox.discordwear` to `com.hiburger.discordwear`, so the new version installs alongside the old one instead of replacing it. Uninstall the old app first (you will have to log in again).
 > 
 > Allowing notifications lets the app run in the background almost all the time. This may use more battery. If you prioritize battery life, consider disabling notification permissions.
 > 
