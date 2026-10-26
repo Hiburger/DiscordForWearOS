@@ -22,11 +22,21 @@ class DiscordGateway(private val token: String) {
     private val _events = MutableSharedFlow<GatewayEvent>(extraBufferCapacity = 64)
     val events: SharedFlow<GatewayEvent> = _events
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    // Guards connect/disconnect/reconnect state; held only across
+    // non-suspending sections (never across delay()).
+    private val lifecycleLock = Any()
     private var ws: WebSocket? = null
     private var heartbeatJob: Job? = null
+    private var reconnectJob: Job? = null
+    private val reconnectAttempt = AtomicInteger(0)
     private val seq = AtomicInteger(-1)
     private var sessionId: String? = null
     private var resumeUrl: String? = null
+
+    // Set by the repository so retries can pause while the watch has no
+    // usable network; the network callback calls onNetworkAvailable() instead.
+    var isOnline: () -> Boolean = { true }
 
     @Volatile
     private var connected = false
@@ -46,17 +56,52 @@ class DiscordGateway(private val token: String) {
         const val HEARTBEAT_ACK = 11
     }
 
-    fun connect() {
-        val url = resumeUrl ?: "wss://gateway.discord.gg/?v=10&encoding=json"
+    fun connect() = synchronized(lifecycleLock) {
+        reconnectJob?.cancel()
+        reconnectJob = null
+        // Close any socket from a previous generation so we never end up with
+        // two live connections (double heartbeats, duplicated dispatches).
+        ws?.let { runCatching { it.close(1000, "reconnect") } }
+        ws = null
+        // Resume on the server-provided gateway when we have one.
+        val url = resumeUrl ?: DiscordHttp.GATEWAY_URL
         val request = Request.Builder().url(url).build()
         ws = http.newWebSocket(request, Listener())
     }
 
-    fun disconnect() {
+    fun disconnect() = synchronized(lifecycleLock) {
         connected = false
+        reconnectJob?.cancel()
+        reconnectJob = null
         heartbeatJob?.cancel()
-        ws?.close(1000, "Goodbye")
+        // Null out ws before closing: the listener callbacks compare against
+        // this field to detect stale sockets and skip cleanup.
+        val old = ws
         ws = null
+        old?.close(1000, "Goodbye")
+    }
+
+    /**
+     * Event-driven reconnect after being offline. Resets the backoff since the
+     * failures were almost certainly connectivity, not Discord refusing us.
+     */
+    fun onNetworkAvailable() = synchronized(lifecycleLock) {
+        if (ws == null && reconnectJob?.isActive != true) {
+            reconnectAttempt.set(0)
+            connect()
+        }
+    }
+
+    private fun scheduleReconnect() = synchronized(lifecycleLock) {
+        // Single-flight: one pending retry at a time.
+        if (reconnectJob?.isActive == true) return
+        // Offline: stop retrying entirely; the network callback wakes us.
+        if (!isOnline()) return
+        val attempt = reconnectAttempt.incrementAndGet()
+        reconnectJob = scope.launch {
+            delay(ReconnectBackoff.jitteredDelayMs(attempt))
+            connect()
+        }
     }
 
     private fun send(op: Int, d: Any?) {
@@ -94,11 +139,17 @@ class DiscordGateway(private val token: String) {
 
     private inner class Listener : WebSocketListener() {
 
+        // Callbacks may fire for a socket from a previous generation after a
+        // reconnect; ignore everything that is not the current socket.
+        private fun isCurrent(webSocket: WebSocket) = webSocket === ws
+
         override fun onOpen(webSocket: WebSocket, response: Response) {
+            if (!isCurrent(webSocket)) return
             connected = true
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
+            if (!isCurrent(webSocket)) return
             val payload = runCatching { JSONObject(text) }.getOrNull() ?: return
             val op = payload.getInt("op")
             val d = payload.opt("d")
@@ -120,7 +171,7 @@ class DiscordGateway(private val token: String) {
 
                 Op.RECONNECT -> {
                     disconnect()
-                    scope.launch { delay(1_000); connect() }
+                    scheduleReconnect()
                 }
 
                 Op.INVALID_SESSION -> {
@@ -128,7 +179,10 @@ class DiscordGateway(private val token: String) {
                     if (!resumable) {
                         sessionId = null; resumeUrl = null
                     }
-                    scope.launch { delay(2_000); connect() }
+                    // The server is closing this socket; forget it so later
+                    // callbacks treat it as stale, then retry with backoff.
+                    synchronized(lifecycleLock) { ws = null }
+                    scheduleReconnect()
                 }
 
                 Op.DISPATCH -> {
@@ -138,17 +192,21 @@ class DiscordGateway(private val token: String) {
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            if (!isCurrent(webSocket)) return
             connected = false
+            ws = null
             heartbeatJob?.cancel()
-            scope.launch {
-                delay(5_000)
-                connect()
-            }
+            scheduleReconnect()
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+            if (!isCurrent(webSocket)) return
             connected = false
+            ws = null
             heartbeatJob?.cancel()
+            // Server closed the session (e.g. after INVALID_SESSION); retry
+            // with backoff instead of dying silently.
+            scheduleReconnect()
         }
     }
 
@@ -170,6 +228,7 @@ class DiscordGateway(private val token: String) {
             "READY" -> {
                 sessionId = d.optString("session_id")
                 resumeUrl = d.optString("resume_gateway_url")
+                reconnectAttempt.set(0) // we are in: reset the retry schedule
                 val user = runCatching { DiscordUser.fromJson(d.getJSONObject("user")) }.getOrNull()
                 val readState = mutableMapOf<String, ChannelUnreadState>()
                 val rsArr = d.optJSONArray("read_state")
