@@ -2,6 +2,10 @@ package com.hiburger.discordwear.api
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -63,6 +67,10 @@ class DiscordRepository(token: String, private val context: Context? = null, val
     private val gateway = DiscordGateway(token)
 
     private val prefs: SharedPreferences? = context?.getSharedPreferences("discord_wear_cache", Context.MODE_PRIVATE)
+
+    // Registered while connected; wakes the gateway when a usable network
+    // comes back so it can stop polling while the watch is offline.
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     private val _currentUser = MutableStateFlow<DiscordUser?>(null)
     val currentUser: StateFlow<DiscordUser?> = _currentUser.asStateFlow()
@@ -194,6 +202,8 @@ class DiscordRepository(token: String, private val context: Context? = null, val
             seedMockData()
             return
         }
+        gateway.isOnline = { isNetworkOnline() }
+        registerNetworkWatch()
         gateway.connect()
         observeGatewayEvents()
         scope.launch { refreshCurrentUser() }
@@ -213,7 +223,44 @@ class DiscordRepository(token: String, private val context: Context? = null, val
         }
     }
 
-    fun disconnect() = gateway.disconnect()
+    fun disconnect() {
+        unregisterNetworkWatch()
+        gateway.disconnect()
+    }
+
+    private fun isNetworkOnline(): Boolean {
+        val cm = context?.getSystemService(ConnectivityManager::class.java) ?: return true
+        val network = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(network) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
+
+    private fun registerNetworkWatch() {
+        val cm = context?.getSystemService(ConnectivityManager::class.java) ?: return
+        if (networkCallback != null) return
+        val cb = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                gateway.onNetworkAvailable()
+            }
+        }
+        runCatching {
+            cm.registerNetworkCallback(
+                NetworkRequest.Builder()
+                    .addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                    .build(),
+                cb
+            )
+            networkCallback = cb
+        }
+    }
+
+    private fun unregisterNetworkWatch() {
+        val cb = networkCallback ?: return
+        networkCallback = null
+        context?.getSystemService(ConnectivityManager::class.java)?.let {
+            runCatching { it.unregisterNetworkCallback(cb) }
+        }
+    }
     fun refreshOnResume(activeChannelId: String?) {
         scope.launch {
             runCatching { refreshDmChannels() }
