@@ -1,0 +1,1760 @@
+package com.hiburger.discordwear.screens
+
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.ScrollableDefaults
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.wear.compose.material3.*
+import coil.ImageLoader
+import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
+import android.content.Context
+import android.media.MediaPlayer
+import android.media.MediaRecorder
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import com.hiburger.discordwear.api.*
+import com.hiburger.discordwear.discordApp
+import com.hiburger.discordwear.SetupPreferences
+import com.hiburger.discordwear.R
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.navigation.NavBackStackEntry
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.snapshots.SnapshotStateMap
+import java.io.File
+
+// quite a few imports
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun ChatScreen(
+    channelId: String,
+    channelName: String,
+    guildId: String? = null,
+    navEntry: NavBackStackEntry? = null,
+    currentUserId: String = "",
+    onNavigateToProfile: ((userId: String, user: DiscordUser?) -> Unit)? = null,
+    onOpenCompose: () -> Unit = {},
+    onOpenMessageOptions: (msgId: String) -> Unit = {},
+    onBack: () -> Unit = {}
+) {
+    val context = LocalContext.current
+    val repo = context.discordApp.repository
+    val listState = rememberScalingLazyListState()
+    val scope = rememberCoroutineScope()
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val imageLoader = context.discordApp.imageLoader
+
+    val allMessages by (repo?.messages ?: return).collectAsState()
+    val messages = allMessages[channelId].orEmpty()
+    val readState by repo.readState.collectAsState()
+    val typingMap by repo.typing.collectAsState()
+    var loading by remember { mutableStateOf(true) }
+    var sendError by remember { mutableStateOf("") }
+    var inputText by rememberSaveable { mutableStateOf("") }
+    var pendingText by rememberSaveable { mutableStateOf("") }
+    var replyToId by rememberSaveable { mutableStateOf("") }
+    val replyingTo = replyToId.takeIf { it.isNotEmpty() }
+        ?.let { id -> messages.firstOrNull { it.id == id } }
+    val roleColorCache = remember { mutableStateMapOf<String, GuildRole?>() }
+    val channelNames = remember(messages.size, loading) { repo.getChannelNames() }
+
+    // Pre-load role data for all visible authors once messages load (guild channels only)
+    LaunchedEffect(messages, guildId, loading) {
+        if (!loading && guildId != null) {
+            messages
+                .map { it.author.id }
+                .distinct()
+                .filterNot { roleColorCache.containsKey(it) }
+                .forEach { userId ->
+                    roleColorCache[userId] = repo?.getTopRoleForUser(guildId, userId)
+                }
+        }
+    }
+    val currentUser by repo.currentUser.collectAsState()
+    val myId = currentUser?.id ?: currentUserId
+    val typingUsers = remember(typingMap, channelId, myId) {
+        (typingMap[channelId] ?: emptySet()).filter { it != myId }
+    }
+    val spoilerRevealOnTap = remember { SetupPreferences.getSpoilerRevealOnTap(context) }
+    val compactMode = remember { SetupPreferences.getCompactMode(context) }
+    val slowModeSecs = remember(channelId) { repo.getSlowModeSeconds(channelId) }
+    var slowRemaining by remember { mutableStateOf(0) }
+
+    LaunchedEffect(slowModeSecs) {
+        if (slowModeSecs > 0) {
+            while (true) {
+                slowRemaining = repo.slowModeRemainingSeconds(channelId)
+                if (slowRemaining <= 0) break
+                delay(1_000)
+            }
+        }
+    }
+
+    val canSend = remember(channelId) { repo.canSendMessage(channelId) }
+
+
+    LaunchedEffect(channelId) {
+        scope.launch {
+            repo.loadMessages(channelId)
+            loading = false
+        }
+    }
+
+    val scrolledToUnread = remember { mutableStateOf(false) }
+    LaunchedEffect(messages.size, loading) { // scrolling to last unread message not working
+        if (!loading && !scrolledToUnread.value && messages.isNotEmpty()) {
+            scrolledToUnread.value = true
+            val lastRead = readState[channelId]?.lastMessageId
+            if (lastRead != null) {
+                val lastReadIdx = messages.indexOfLast { it.id <= lastRead }
+                when {
+                    lastReadIdx >= 0 -> {
+                        scope.launch { listState.animateScrollToItem(lastReadIdx) }
+                    }
+
+                    else -> {
+                        scope.launch { listState.animateScrollToItem(0) }
+                    }
+                }
+            } else {
+                scope.launch { listState.animateScrollToItem((messages.size - 1).coerceAtLeast(0)) }
+            }
+        }
+    }
+
+    LaunchedEffect(messages.size) {
+        if (!loading) {
+            messages.lastOrNull()?.id?.let { repo?.markChannelRead(channelId, it) }
+        }
+    }
+
+    var uploadError by remember { mutableStateOf("") }
+
+    var isRecording by remember { mutableStateOf(false) }
+    var recordingSecs by remember { mutableStateOf(0) }
+    var voiceFile by remember { mutableStateOf<File?>(null) }
+    var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
+    val micPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (!granted) uploadError = "Microphone permission denied"
+    }
+
+    fun startRecording() {
+        val hasAudio = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
+        if (!hasAudio) {
+            micPermLauncher.launch(Manifest.permission.RECORD_AUDIO); return
+        }
+        try {
+            val f = File(context.cacheDir, "voice_${System.currentTimeMillis()}.ogg")
+            voiceFile = f
+            // MediaRecorder(context) needs API 31; the legacy constructor is the
+            // only option below that and throws on unsupported paths otherwise
+            val mr = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                MediaRecorder(context)
+            } else {
+                @Suppress("DEPRECATION")
+                MediaRecorder()
+            }
+            mr.setAudioSource(MediaRecorder.AudioSource.MIC)
+            mr.setOutputFormat(MediaRecorder.OutputFormat.OGG)
+            mr.setAudioEncoder(MediaRecorder.AudioEncoder.OPUS)
+            mr.setOutputFile(f.absolutePath)
+            mr.prepare()
+            mr.start()
+            recorder = mr
+            isRecording = true
+            recordingSecs = 0
+        } catch (e: Exception) {
+            uploadError = "Mic error: ${e.message}"
+            isRecording = false
+        }
+    }
+
+    fun stopAndSendRecording() {
+        val mr = recorder ?: return
+        val f = voiceFile ?: return
+        val dur = recordingSecs.toDouble()
+        try {
+            mr.stop()
+            mr.release()
+        } catch (_: Exception) {
+        }
+        recorder = null
+        isRecording = false
+        scope.launch {
+            runCatching {
+                val bytes = f.readBytes()
+                f.delete()
+                repo.sendVoiceMessage(channelId, bytes, dur)
+                    .onFailure { uploadError = "Voice send failed: ${it.message}" }
+            }.onFailure { uploadError = "Error: ${it.message}" }
+        }
+    }
+
+    fun cancelRecording() {
+        val mr = recorder ?: return
+        try {
+            mr.stop(); mr.release()
+        } catch (_: Exception) {
+        }
+        recorder = null
+        isRecording = false
+        voiceFile?.delete()
+        voiceFile = null
+    }
+
+    LaunchedEffect(isRecording) {
+        if (isRecording) {
+            while (isRecording) {
+                delay(1_000)
+                recordingSecs++
+                if (recordingSecs >= 120) {
+                    stopAndSendRecording(); break
+                }
+            }
+        }
+    }
+
+    BackHandler(enabled = isRecording) {
+        cancelRecording()
+    }
+
+
+    LaunchedEffect(Unit) {
+        navEntry?.savedStateHandle?.remove<String>("insertEmoji")?.let { insert ->
+            val newText = if (inputText.isBlank()) insert else "$inputText$insert"
+            inputText = newText
+            pendingText = newText
+        }
+        if (navEntry?.savedStateHandle?.remove<Boolean>("startRecording") == true) {
+            startRecording()
+        }
+        navEntry?.savedStateHandle?.remove<String>("replyToId")?.let { replyToId = it }
+        navEntry?.savedStateHandle?.remove<String>("actionError")?.let { sendError = it }
+    }
+
+    if (loading) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
+    val isAtBottom by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 5
+            info.totalItemsCount == 4 || lastVisible >= info.totalItemsCount - 6
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        ScreenScaffold(scrollState = listState, timeText = {}) {
+            ScalingLazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                autoCentering = null,
+                contentPadding = PaddingValues(top = 48.dp),
+                flingBehavior = ScrollableDefaults.flingBehavior()
+            ) {
+                // channel header pinned at the top of the Box below; DMs skip it
+                // it's already on every row and the user probably knows who he's talking to right :p
+
+                if (pendingText.isNotBlank()) {
+                    item(key = "pending_text") {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceContainer,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                pendingText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 2
+                            )
+                            Row {
+                                Text(
+                                    "▶", // set to material send icons instead of Unicode
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (slowRemaining > 0)
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    else MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .clickable {
+                                            if (slowRemaining > 0) return@clickable
+                                            val text = pendingText
+                                            pendingText = ""
+                                            inputText = ""
+                                            scope.launch {
+                                                slowRemaining = slowModeSecs
+                                                val replyTarget = replyingTo
+                                                if (replyTarget != null) {
+                                                    repo.sendReply(channelId, text, replyTarget.id)
+                                                        .onFailure { sendError = "Failed: ${it.message}" }
+                                                    replyToId = ""
+                                                } else {
+                                                    repo.sendMessage(channelId, text)
+                                                        .onFailure { sendError = "Failed: ${it.message}" }
+                                                }
+                                                while (true) {
+                                                    delay(1_000)
+                                                    slowRemaining = repo.slowModeRemainingSeconds(channelId)
+                                                    if (slowRemaining <= 0) break
+                                                }
+                                            }
+                                        }
+                                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                                )
+                                Text(
+                                    "X",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier
+                                        .clickable {
+                                            pendingText = ""
+                                            inputText = ""
+                                        }
+                                        .padding(4.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                when {
+                    messages.isEmpty() -> item(key = "empty") {
+                        Text("No messages yet", style = MaterialTheme.typography.bodySmall)
+                    }
+
+                    else -> items(messages.size, key = { messages[it].id }) { index ->
+                        val msg = messages[index]
+                        val prevMsg = if (index > 0) messages[index - 1] else null
+                        fun String.toEpochMillis(): Long = runCatching {
+                            java.time.OffsetDateTime.parse(this).toInstant().toEpochMilli()
+                        }.getOrElse { 0L }
+
+                        val gapMs = if (prevMsg != null)
+                            msg.timestamp.toEpochMillis() - prevMsg.timestamp.toEpochMillis()
+                        else Long.MAX_VALUE
+
+                        val isContinuation = prevMsg != null &&
+                                prevMsg.author.id == msg.author.id &&
+                                msg.type !in listOf(19, 23) &&
+                                prevMsg.type !in listOf(19, 23) &&
+                                gapMs < 10 * 60 * 1000L
+
+                        MessageBubble(
+                            msg = msg,
+                            isOwn = msg.author.id == myId,
+                            isContinuation = isContinuation,
+                            imageLoader = imageLoader,
+                            channelNames = channelNames,
+                            compactMode = compactMode,
+                            spoilerRevealOnTap = spoilerRevealOnTap,
+                            guildId = guildId,
+                            roleColorCache = roleColorCache,
+                            onReact = { emoji ->
+                                scope.launch { repo.toggleReaction(channelId, msg.id, emoji) }
+                            },
+                            onSwipeLeft = {
+                                replyToId = msg.id
+                            },
+                            onLongPress = {
+                                // important! Navigating away disposes this screen; that would
+                                // orphan the recorder
+                                if (!isRecording) onOpenMessageOptions(msg.id)
+                            },
+                            onAvatarClick = { userId ->
+                                if (!isRecording) {
+                                    onNavigateToProfile?.invoke(userId, msg.author.takeIf { it.id == userId })
+                                }
+                            }
+                        )
+                    }
+                }
+
+                if (sendError.isNotEmpty()) {
+                    item(key = "send_error") {
+                        Text(
+                            sendError, color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+
+                // IMPORTANT: for the sake of "postérité" (look it up), i've kept the comment from the guy that created upstream. The following comment is, hence, NOT my production.
+                // this BS not worky :(
+                //  val currentTypingUsers = typingMap[channelId].orEmpty().filter { it != myId }
+                //if (currentTypingUsers.isNotEmpty()) {
+                /*  item(key = "typing_indicator") {
+                      val names = currentTypingUsers.mapNotNull { uid -> repo.getDisplayName(uid) }
+                      val label = when {
+                          names.isEmpty() -> "Someone is typing…"
+                          names.size == 1 -> "${names[0]} is typing…"
+                          names.size == 2 -> "${names[0]} and ${names[1]} are typing…"
+                          else            -> "Several people are typing…"
+                      }
+                      Text(
+                          text = label,
+                          style = MaterialTheme.typography.labelSmall,
+                          color = MaterialTheme.colorScheme.onSurfaceVariant,
+                          modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)
+                      )
+                  }
+              //}*/
+
+                item(key = "text_input") {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        if (replyingTo != null) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        MaterialTheme.colorScheme.secondaryContainer,
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "↩ ${replyingTo!!.author.displayName}: ${replyingTo!!.content.take(30)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(
+                                    "X",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.clickable { replyToId = "" }.padding(4.dp)
+                                )
+                            }
+                        }
+
+                        if (canSend) {
+                            OutlinedTextField(
+                                value = inputText,
+                                onValueChange = { newValue ->
+                                    inputText = newValue
+                                    pendingText = newValue
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth(0.8f)
+                                    .align(Alignment.CenterHorizontally)
+                                    .height(48.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                placeholder = {
+                                    Text(
+                                        "Message #$channelName",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    )
+                                },
+                                textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
+                                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    cursorColor = MaterialTheme.colorScheme.primary
+                                ),
+                                trailingIcon = {
+                                    FilledIconButton(
+                                        onClick = {
+                                            val text = inputText.trim()
+                                            if (text.isBlank() || slowRemaining > 0) return@FilledIconButton
+                                            inputText = ""
+                                            pendingText = ""
+                                            scope.launch {
+                                                slowRemaining = slowModeSecs
+                                                val replyTarget = replyingTo
+                                                if (replyTarget != null) {
+                                                    repo.sendReply(channelId, text, replyTarget.id)
+                                                        .onFailure { sendError = "Failed: ${it.message}" }
+                                                    replyToId = ""
+                                                } else {
+                                                    repo.sendMessage(channelId, text)
+                                                        .onFailure { sendError = "Failed: ${it.message}" }
+                                                }
+                                                while (true) {
+                                                    delay(1_000)
+                                                    slowRemaining = repo.slowModeRemainingSeconds(channelId)
+                                                    if (slowRemaining <= 0) break
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.size(32.dp),
+                                        enabled = inputText.isNotBlank() && slowRemaining <= 0
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.send),
+                                            contentDescription = "Send"
+                                        )
+                                    }
+                                },
+                                minLines = 1,
+                                maxLines = 4,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
+                            )
+                        } else {
+                            Text(
+                                text = "You cannot send messages here",//add lock icon from /res/drawable
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+
+                item(key = "action_buttons") {
+                    if (canSend) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            if (!isRecording) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(6.dp),
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    FilledIconButton(
+                                        onClick = onBack,
+                                        modifier = Modifier.height(40.dp).width(40.dp),
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.back),
+                                            contentDescription = "Back"
+                                        )
+                                    }
+                                    Spacer(Modifier.width(16.dp))
+                                    FilledIconButton(
+                                        onClick = { onOpenCompose() },
+                                        modifier = Modifier.height(40.dp).width(40.dp),
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.add),
+                                            contentDescription = "Compose Actions"
+                                        )
+                                    }
+                                }
+                            } else {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    val mins = recordingSecs / 60
+                                    val secs = recordingSecs % 60
+                                    Text(
+                                        text = "%02d:%02d".format(mins, secs),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceEvenly
+                                    ) {
+                                        Button(
+                                            onClick = { cancelRecording() },
+                                            modifier = Modifier.weight(1f).height(34.dp),
+                                            colors = ButtonDefaults.outlinedButtonColors()
+                                        ) { Text("Cancel", fontSize = 12.sp) }
+                                        Spacer(Modifier.width(6.dp))
+                                        Button(
+                                            onClick = { stopAndSendRecording() },
+                                            modifier = Modifier.weight(1f).height(34.dp),
+                                            colors = ButtonDefaults.filledTonalButtonColors()
+                                        ) { Text("Send", fontSize = 11.sp) }
+                                    }
+                                }
+                            }
+                            if (uploadError.isNotEmpty()) {
+                                Text(
+                                    uploadError,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.clickable { uploadError = "" }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // pinned channel header (server channels only): fixed strip at
+            // the top, independent of the message count
+            if (guildId != null) {
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(top = 26.dp, bottom = 2.dp)
+                ) {
+                    Text("#$channelName", style = MaterialTheme.typography.titleSmall)
+                }
+            }
+        }
+
+
+        TimeText()
+
+        if (!isAtBottom) { // need to be higher up to show this
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = 10.dp),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                FilledIconButton(
+                    onClick = { scope.launch { listState.animateScrollToItem(Int.MAX_VALUE) } },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.down),
+                        contentDescription = "Down"
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SpoilerText(text: String, revealOnTap: Boolean) {
+    var revealed by remember { mutableStateOf(false) }
+    val modifier = if (revealOnTap) Modifier.clickable { revealed = true } else Modifier
+    Box(modifier = modifier) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (revealed) MaterialTheme.colorScheme.onSurface
+            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0f)
+        )
+        if (!revealed) {
+            Text(
+                text = text.map { '█' }.joinToString(""),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+internal fun buildEmojiLink(insertText: String): String {
+    val animated = Regex("""<a:(\w+):(\d+)>""").find(insertText) ?: return insertText
+    val id = animated.groupValues[2]
+    return "https://cdn.discordapp.com/emojis/$id.webp?size=80"
+}
+
+
+fun parseInsertTextToReactionEmoji(insertText: String): ReactionEmoji? {
+    val animatedMatch = Regex("""<a:(\w+):(\d+)>""").find(insertText)
+    if (animatedMatch != null) {
+        return ReactionEmoji(
+            id = animatedMatch.groupValues[2],
+            name = animatedMatch.groupValues[1],
+            animated = true
+        )
+    }
+    val customMatch = Regex("""<:(\w+):(\d+)>""").find(insertText)
+    if (customMatch != null) {
+        return ReactionEmoji(
+            id = customMatch.groupValues[2],
+            name = customMatch.groupValues[1],
+            animated = false
+        )
+    }
+    if (insertText.isNotBlank()) {
+        return ReactionEmoji(id = null, name = insertText, animated = false)
+    }
+    return null
+}
+
+@Composable
+internal fun MessageOptionsScreen(
+    msg: DiscordMessage,
+    isOwn: Boolean,
+    channelId: String,
+    onReply: () -> Unit,
+    onEdit: () -> Unit,
+    onReact: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val repo = context.discordApp.repository
+    val scope = rememberCoroutineScope()
+    var actionError by remember { mutableStateOf("") }
+    BackHandler(onBack = onDismiss)
+    val listState = rememberScalingLazyListState()
+    ScreenScaffold(scrollState = listState) {
+        ScalingLazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+            item {
+                Text(
+                    "Message by ${msg.author.displayName}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            item {
+                Button(
+                    onClick = onReply,
+                    modifier = Modifier.fillMaxWidth().height(36.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors()
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.reply),
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("Reply")
+                }
+            }
+            item {
+                Button(
+                    onClick = onReact,
+                    modifier = Modifier.fillMaxWidth().height(36.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors()
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.emoji),
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("React")
+                }
+            }
+            item {
+                Button(
+                    onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE)
+                                as android.content.ClipboardManager
+                        clipboard.setPrimaryClip(
+                            android.content.ClipData.newPlainText("message", msg.content)
+                        )
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth().height(36.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors()
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.copy),
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("Copy Text")
+                }
+            }
+            if (isOwn) {
+                item {
+                    Button(
+                        onClick = onEdit,
+                        modifier = Modifier.fillMaxWidth().height(36.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors()
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.edit),
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Edit")
+                    }
+                }
+                item {
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                repo?.deleteMessage(channelId, msg.id)
+                                    ?.onFailure { actionError = "Failed: ${it.message}" }
+                                    ?.onSuccess { onDismiss() }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(36.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.delete),
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Delete")
+                    }
+                }
+            }
+            if (actionError.isNotEmpty()) {
+                item {
+                    Text(
+                        actionError,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.clickable { actionError = "" }
+                    )
+                }
+            }
+            item {
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth().height(36.dp),
+                    colors = ButtonDefaults.outlinedButtonColors()
+                ) { Text("Cancel") }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MessageBubble(
+    msg: DiscordMessage,
+    isOwn: Boolean,
+    isContinuation: Boolean,
+    imageLoader: ImageLoader,
+    channelNames: Map<String, String> = emptyMap(),
+    compactMode: Boolean = false,
+    spoilerRevealOnTap: Boolean = true,
+    guildId: String? = null,
+    roleColorCache: SnapshotStateMap<String, GuildRole?> = mutableStateMapOf(),
+    onReact: (ReactionEmoji) -> Unit,
+    onSwipeLeft: () -> Unit,
+    onLongPress: () -> Unit,
+    onAvatarClick: (userId: String) -> Unit = {}
+) {
+    val context = LocalContext.current
+    val repo = context.discordApp.repository
+
+    val userNames = remember(msg.mentionedUsers) {
+        msg.mentionedUsers.associate { it.id to it.displayName }
+    }
+
+    // Role data is pre-loaded in ChatScreen for all visible authors
+    val topRole = if (guildId != null) roleColorCache[msg.author.id] else null
+    val rawRoleColor = topRole?.color
+    val authorNameColor = if (rawRoleColor != null && rawRoleColor != 0)
+        Color(0xFF000000.toInt() or rawRoleColor)
+    else
+        MaterialTheme.colorScheme.onSurfaceVariant
+    var offsetX by remember { mutableStateOf(0f) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = if (isContinuation) 0.dp else 4.dp, bottom = 2.dp)
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        if (offsetX < -40f) onSwipeLeft()
+                        offsetX = 0f
+                    },
+                    onHorizontalDrag = { _, delta ->
+                        if (delta < 0) offsetX += delta
+                    }
+                )
+            }
+            .pointerInput(Unit) {
+                // on scroll the app shouldnt register a long press and show the long press menu
+                // that's something that happened quite often and was annoying
+                detectTapGestures(
+                    onLongPress = { onLongPress() }
+                )
+            },
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.Top
+    ) {
+        if (!compactMode && !isContinuation) {
+            DiscordAvatarWithDecoration(
+                user = msg.author,
+                imageLoader = imageLoader,
+                size = 22.dp,
+                onClick = { onAvatarClick(msg.author.id) }
+            )
+            Spacer(Modifier.width(4.dp))
+        } else if (!compactMode) {
+            Spacer(Modifier.width(26.dp))
+        }
+
+        Column(
+            horizontalAlignment = Alignment.Start,
+            modifier = Modifier.widthIn(max = 155.dp)
+        ) {
+            if (!isContinuation) {
+                val timeLabel = remember(msg.timestamp) {
+                    runCatching {
+                        val instant = java.time.OffsetDateTime.parse(msg.timestamp).toInstant()
+                        val zoned = instant.atZone(java.time.ZoneId.systemDefault())
+                        val now = java.time.ZonedDateTime.now()
+                        val use24 = android.text.format.DateFormat.is24HourFormat(context)
+                        val timeFmt = if (use24)
+                            java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+                        else
+                            java.time.format.DateTimeFormatter.ofPattern("h:mma")
+                        val timeStr = zoned.format(timeFmt).lowercase()
+
+                        val todayDate = now.toLocalDate()
+                        val yesterdayDate = todayDate.minusDays(1)
+                        when (zoned.toLocalDate()) {
+                            todayDate -> timeStr
+                            yesterdayDate -> "Yesterday $timeStr"
+                            else -> "${zoned.monthValue}/${zoned.dayOfMonth} $timeStr"
+                        }
+                    }.getOrElse { "" }
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = msg.author.displayName,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = authorNameColor
+                    )
+                    // Role icon: show only once loaded, unicode emoji takes priority over custom image
+                    if (topRole != null) {
+                        when {
+                            !topRole.unicodeEmoji.isNullOrEmpty() -> {
+                                Text(
+                                    text = topRole.unicodeEmoji,
+                                    fontSize = 10.sp
+                                )
+                            }
+
+                            !topRole.iconHash.isNullOrEmpty() -> {
+                                SubcomposeAsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(topRole.iconUrl())
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = null,
+                                    imageLoader = imageLoader,
+                                    modifier = Modifier.size(12.dp),
+                                    loading = { /* Hide while loading */ },
+                                    error = { /* Hide on error */ }
+                                )
+                            }
+                        }
+                    }
+                    if (timeLabel.isNotEmpty()) {
+                        Text(
+                            text = timeLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            fontSize = 9.sp
+                        )
+                    }
+                }
+            }
+
+            val ref = msg.referencedMessage
+            if (msg.type == 19 && ref != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                            RoundedCornerShape(4.dp)
+                        )
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "↩ ${ref.author.displayName}: ",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        ref.content.take(40).ifBlank { "Attachment" },//icon?
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                }
+                Spacer(Modifier.height(2.dp))
+            }
+
+            if (msg.type == 23) {//fowarded messages are not working :P
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            MaterialTheme.colorScheme.secondaryContainer,
+                            RoundedCornerShape(6.dp)
+                        )
+                        .padding(6.dp)
+                ) {
+                    Text(
+                        "Forwarded",//does not even show this :P
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    val fwdAuthorName = msg.referencedMessage?.author?.displayName ?: "Unknown"
+                    Text(//I blame the bot API
+                        fwdAuthorName,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    val fwdText = msg.forwardedContent?.takeIf { it.isNotBlank() }
+                        ?: msg.referencedMessage?.content?.takeIf { it.isNotBlank() }
+                    if (!fwdText.isNullOrBlank()) {
+                        MessageContent(
+                            content = fwdText,
+                            imageLoader = imageLoader,
+                            context = context,
+                            userNames = userNames,
+                            channelNames = channelNames,
+                            spoilerRevealOnTap = spoilerRevealOnTap
+                        )
+                    }
+                    val fwdAtts = msg.forwardedAttachments.ifEmpty {
+                        msg.referencedMessage?.attachments ?: emptyList()
+                    }
+                    fwdAtts.filter { it.isImage }.forEach { att ->
+                        MediaImage(att.proxyUrl, att.filename, imageLoader)
+                    }
+                    val fwdEmbeds = msg.forwardedEmbeds.ifEmpty {
+                        msg.referencedMessage?.embeds ?: emptyList()
+                    }
+                    fwdEmbeds.forEach { embed ->
+                        EmbedCard(embed, imageLoader)
+                    }
+                    val fwdStickers = msg.referencedMessage?.stickers ?: emptyList()
+                    fwdStickers.filter { it.isDisplayable }.forEach { s ->
+                        MediaImage(s.imageUrl, s.name, imageLoader, size = 80.dp)
+                    }
+                    if (fwdText.isNullOrBlank() && fwdAtts.isEmpty() && fwdEmbeds.isEmpty() && fwdStickers.isEmpty()) {
+                        Text(
+                            "(no preview available)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                if (msg.content.isNotBlank()) {
+                    MessageContent(
+                        content = msg.content,
+                        imageLoader = imageLoader,
+                        context = context,
+                        userNames = userNames,
+                        channelNames = channelNames,
+                        spoilerRevealOnTap = spoilerRevealOnTap
+                    )
+                }
+            }
+
+            msg.attachments.filter { it.isImage }.forEach { att ->
+                MediaImage(att.proxyUrl, att.filename, imageLoader)
+            }
+            msg.attachments.filter { it.isVideo }.forEach { att ->
+                VideoAttachment(att, imageLoader)
+            }
+            msg.attachments.filter { it.isAudio }.forEach { att ->
+                AudioAttachment(att)
+            }
+            msg.stickers.filter { it.isDisplayable }.forEach { s ->
+                MediaImage(s.imageUrl, s.name, imageLoader, size = 80.dp)
+            }
+            msg.embeds
+                .filter { embed ->
+                    !(embed.type == "link" && //lets clean this up a litlle more
+                            embed.url?.contains("cdn.discordapp.com/emojis/") == true)
+                }
+                .forEach { embed ->
+                    EmbedCard(embed, imageLoader)
+                }
+
+            if (msg.reactions.isNotEmpty()) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    msg.reactions.forEach { reaction ->
+                        ReactionChip(reaction = reaction, imageLoader = imageLoader, onClick = {
+                            onReact(reaction.emoji)
+                        })
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MessageContent(
+    content: String,
+    imageLoader: ImageLoader,
+    context: Context,
+    userNames: Map<String, String> = emptyMap(),
+    roleNames: Map<String, String> = emptyMap(),
+    channelNames: Map<String, String> = emptyMap(),
+    spoilerRevealOnTap: Boolean = true
+) {
+    val parts = remember(content, userNames, roleNames, channelNames) {
+        ContentParser.parse(content, userNames, roleNames, channelNames)
+    }
+
+    FlowRow(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        parts.forEach { part ->
+            when (part) {
+                is ContentParser.Part.PlainText -> {
+                    val spans = ContentParser.parseMarkdown(part.text)
+                    spans.forEach { span ->
+                        if (span.spoiler) {
+                            SpoilerText(span.text, spoilerRevealOnTap)
+                        } else {
+                            val annotated = buildAnnotatedString {
+                                val style = SpanStyle(
+                                    fontWeight = if (span.bold) androidx.compose.ui.text.font.FontWeight.Bold
+                                    else null,
+                                    fontStyle = if (span.italic) androidx.compose.ui.text.font.FontStyle.Italic
+                                    else null,
+                                    textDecoration = when {
+                                        span.strikethrough -> TextDecoration.LineThrough
+                                        else -> null
+                                    },
+                                    background = if (span.code)
+                                        MaterialTheme.colorScheme.surfaceContainer
+                                    else androidx.compose.ui.graphics.Color.Unspecified,
+                                    fontFamily = if (span.code)
+                                        androidx.compose.ui.text.font.FontFamily.Monospace
+                                    else null
+                                )
+                                withStyle(style) { append(span.text) }
+                            }
+                            Text(text = annotated, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+
+                is ContentParser.Part.CustomEmoji -> {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(part.url).crossfade(true).build(),
+                        imageLoader = imageLoader,
+                        contentDescription = part.name,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                is ContentParser.Part.UserMention -> {
+                    val annotated = buildAnnotatedString {
+                        withStyle(
+                            SpanStyle(
+                                color = MaterialTheme.colorScheme.primary,
+                                background = MaterialTheme.colorScheme.primaryContainer
+                            )
+                        ) { append("@${part.displayName}") }
+                    }
+                    Text(text = annotated, style = MaterialTheme.typography.bodySmall)
+                }
+
+                is ContentParser.Part.RoleMention -> {
+                    val annotated = buildAnnotatedString {
+                        withStyle(SpanStyle(color = MaterialTheme.colorScheme.tertiary)) {
+                            append("@${part.roleName}")
+                        }
+                    }
+                    Text(text = annotated, style = MaterialTheme.typography.bodySmall)
+                }
+
+                is ContentParser.Part.ChannelMention -> {
+                    val annotated = buildAnnotatedString {
+                        withStyle(SpanStyle(color = MaterialTheme.colorScheme.secondary)) {
+                            append("#${part.channelName}")
+                        }
+                    }
+                    Text(text = annotated, style = MaterialTheme.typography.bodySmall)
+                }
+
+                is ContentParser.Part.Link -> {
+                    val annotated = buildAnnotatedString {
+                        withStyle(
+                            SpanStyle(
+                                color = MaterialTheme.colorScheme.primary,
+                                textDecoration = TextDecoration.Underline
+                            )
+                        ) { append(part.url) }
+                    }
+                    Text(
+                        text = annotated,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.clickable {
+                            runCatching {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(part.url))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                context.startActivity(intent)
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReactionChip(reaction: Reaction, imageLoader: ImageLoader, onClick: () -> Unit) {
+    val bgColor = if (reaction.me)
+        MaterialTheme.colorScheme.primaryContainer
+    else
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+
+    Box(
+        modifier = Modifier
+            .height(22.dp)
+            .background(color = bgColor, shape = RoundedCornerShape(11.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            val imgUrl = reaction.emoji.imageUrl
+            if (imgUrl != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(imgUrl).crossfade(true).build(),
+                    imageLoader = imageLoader,
+                    contentDescription = reaction.emoji.name,
+                    modifier = Modifier.size(14.dp)
+                )
+            } else {
+                Text(
+                    text = reaction.emoji.name,
+                    fontSize = 13.sp,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                    lineHeight = 14.sp,
+                    modifier = Modifier.wrapContentSize()
+                )
+            }
+            Text(
+                text = reaction.count.toString(),
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 10.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun MediaImage(url: String, contentDesc: String, imageLoader: ImageLoader, size: Dp = 120.dp) {
+    AsyncImage(
+        model = ImageRequest.Builder(LocalContext.current)
+            .data(url).crossfade(true).build(),
+        imageLoader = imageLoader,
+        contentDescription = contentDesc,
+        contentScale = ContentScale.Fit,
+        modifier = Modifier.padding(top = 2.dp).widthIn(max = size).heightIn(max = size)
+    )
+}
+
+@Composable
+private fun EmbedCard(embed: Embed, imageLoader: ImageLoader) {
+    Column(modifier = Modifier.padding(top = 2.dp)) {
+        embed.title?.let {
+            Text(
+                it, style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        embed.description?.let {
+            Text(it.take(120), style = MaterialTheme.typography.bodySmall)
+        }
+        val imgUrl = embed.displayImageUrl
+        if (imgUrl != null) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(imgUrl).crossfade(true).build(),
+                imageLoader = imageLoader,
+                contentDescription = embed.title ?: "embed",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.widthIn(max = 140.dp).heightIn(max = 140.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun VideoAttachment(att: Attachment, imageLoader: ImageLoader) {
+    val context = LocalContext.current
+    Box(
+        modifier = Modifier
+            .padding(top = 2.dp)
+            .widthIn(max = 140.dp)
+            .heightIn(max = 100.dp)
+            .clickable {
+                runCatching {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(att.url))
+                        .setDataAndType(Uri.parse(att.url), att.contentType ?: "video/*")
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                }
+            }
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(att.proxyUrl)
+                .crossfade(true)
+                .build(),
+            imageLoader = imageLoader,
+            contentDescription = att.filename,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .widthIn(max = 140.dp)
+                .heightIn(max = 100.dp)
+        )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.35f)),
+            contentAlignment = Alignment.Center
+        ) {
+            /*Icon(
+                painter = R.drawable.play,
+                contentDescription = "Play",
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+            )*/
+            Text("playy")
+        }
+    }
+    Text(
+        text = att.filename,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1
+    )
+}
+
+@Composable
+private fun AudioAttachment(att: Attachment) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var isPlaying by remember { mutableStateOf(false) }
+    var progress by remember { mutableStateOf(0f) }
+    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+
+    DisposableEffect(att.url) {
+        onDispose {
+            mediaPlayer?.release()
+            mediaPlayer = null
+        }
+    }
+    LaunchedEffect(isPlaying) {
+        while (isPlaying) {
+            val mp = mediaPlayer
+            if (mp != null && mp.isPlaying) {
+                val dur = mp.duration
+                if (dur > 0) progress = mp.currentPosition.toFloat() / dur.toFloat()
+            }
+            delay(300)
+        }
+    }
+
+    Column(modifier = Modifier.padding(top = 2.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    MaterialTheme.colorScheme.surfaceContainer,
+                    RoundedCornerShape(8.dp)
+                )
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                painter = painterResource(id = if (isPlaying) R.drawable.pause else R.drawable.play),
+                contentDescription = if (isPlaying) "Pause" else "Play",
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .size(24.dp)
+                    .clickable {
+                        scope.launch {
+                            if (isPlaying) {
+                                mediaPlayer?.pause()
+                                isPlaying = false
+                            } else {
+                                val mp = mediaPlayer ?: MediaPlayer().also {
+                                    it.setDataSource(att.url)
+                                    it.prepare()
+                                    it.setOnCompletionListener { _ ->
+                                        isPlaying = false
+                                        progress = 0f
+                                    }
+                                    mediaPlayer = it
+                                }
+                                mp.start()
+                                isPlaying = true
+                            }
+                        }
+                    }
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = att.filename,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth().height(3.dp)
+                )
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun DiscordAvatarWithDecoration(
+    user: com.hiburger.discordwear.api.DiscordUser,
+    imageLoader: ImageLoader,
+    size: Dp,
+    onClick: () -> Unit = {}
+) {
+    val decorUrl = user.avatarDecorationUrl()
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .pointerInput(onClick) {
+                detectTapGestures(
+                    onTap = { onClick() }
+                )
+            }
+    ) {
+        DiscordAvatar(url = user.avatarUrl(32), displayName = user.displayName, imageLoader = imageLoader, size = size)
+        if (decorUrl != null) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(decorUrl).crossfade(false).build(),
+                imageLoader = imageLoader,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(size * 1.4f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun DiscordAvatar(url: String?, displayName: String, imageLoader: ImageLoader, size: Dp) {
+    val initial = displayName.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+    val blurple = androidx.compose.ui.graphics.Color(0xFF5865F2)
+
+    if (url == null) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .background(color = blurple, shape = CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = initial,
+                style = MaterialTheme.typography.labelSmall,
+                color = androidx.compose.ui.graphics.Color.White,
+                fontSize = (size.value * 0.45f).sp
+            )
+        }
+    } else {
+        SubcomposeAsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(url)
+                .crossfade(true)
+                .build(),
+            imageLoader = imageLoader,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.size(size).clip(CircleShape),
+            error = {
+                Box(
+                    modifier = Modifier
+                        .size(size)
+                        .background(color = blurple, shape = CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = initial,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = androidx.compose.ui.graphics.Color.White,
+                        fontSize = (size.value * 0.45f).sp
+                    )
+                }
+            }
+        )
+    }
+}
+
+
+@Composable
+internal fun ComposeActionsScreen(
+    onOpenEmoji: () -> Unit,
+    onOpenStickers: () -> Unit,
+    onOpenPhoto: () -> Unit,
+    onVoice: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var permError by remember { mutableStateOf("") }
+    val imagePermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) onOpenPhoto() else permError = "Photo permission denied"
+    }
+    BackHandler(onBack = onDismiss)
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(top = 30.dp),
+            verticalArrangement = Arrangement.Center
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Spacer(Modifier.width(36.dp))
+                Text(
+                    "Compose",
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.weight(0.18f))
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    FilledIconButton(
+                        onClick = onOpenEmoji,
+                        modifier = Modifier.height(44.dp).width(44.dp),
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.emoji),
+                            contentDescription = "Emoji"
+                        )
+                    }
+                    Text("Emoji", style = MaterialTheme.typography.labelSmall)
+                }
+                Spacer(Modifier.width(20.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    FilledIconButton(
+                        onClick = onOpenStickers,
+                        modifier = Modifier.height(44.dp).width(44.dp),
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.sticker),
+                            contentDescription = "Stickers"
+                        )
+                    }
+                    Text("Stickers", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    FilledIconButton(
+                        onClick = {
+                            val perm = if (android.os.Build.VERSION.SDK_INT >= 33)
+                                Manifest.permission.READ_MEDIA_IMAGES
+                            else
+                                Manifest.permission.READ_EXTERNAL_STORAGE
+                            val hasPerm = ContextCompat.checkSelfPermission(context, perm) ==
+                                    PackageManager.PERMISSION_GRANTED
+                            if (hasPerm) {
+                                onOpenPhoto()
+                            } else {
+                                imagePermLauncher.launch(perm)
+                            }
+                        },
+                        modifier = Modifier.height(44.dp).width(44.dp),
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.image),
+                            contentDescription = "Upload Photo"
+                        )
+                    }
+                    Text("Photo", style = MaterialTheme.typography.labelSmall)
+                }
+                Spacer(Modifier.width(20.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    FilledIconButton(
+                        onClick = onVoice,
+                        modifier = Modifier.height(44.dp).width(44.dp),
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.mic),
+                            contentDescription = "Voice Message"
+                        )
+                    }
+                    Text("Voice", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+            if (permError.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    permError,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.labelSmall,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { permError = "" }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun EditChatScreen(
+    channelId: String,
+    msg: DiscordMessage,
+    onDismiss: () -> Unit
+) {
+    val repo = LocalContext.current.discordApp.repository
+    val scope = rememberCoroutineScope()
+    var editText by rememberSaveable { mutableStateOf(msg.content) }
+    var editError by remember { mutableStateOf("") }
+    BackHandler(onBack = onDismiss)
+    val editListState = rememberScalingLazyListState()
+    ScreenScaffold(scrollState = editListState) {
+        ScalingLazyColumn(state = editListState, modifier = Modifier.fillMaxSize()) {
+            item {
+                Text(
+                    "Edit message",
+                    style = MaterialTheme.typography.titleSmall
+                )
+            }
+            item {
+                OutlinedTextField(
+                    value = editText,
+                    onValueChange = { editText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    label = { Text("Edit", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        cursorColor = MaterialTheme.colorScheme.primary
+                    ),
+                    minLines = 1,
+                    maxLines = 4,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
+                )
+            }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Button(
+                        onClick = {
+                            val text = editText.trim()
+                            if (text.isNotBlank()) {
+                                scope.launch {
+                                    repo?.editMessage(channelId, msg.id, text)
+                                        ?.onFailure { editError = "Failed: ${it.message}" }
+                                        ?.onSuccess { onDismiss() }
+                                }
+                            }
+                        },
+                        modifier = Modifier.weight(1f).height(36.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(),
+                        enabled = editText.isNotBlank()
+                    ) { Text("Save") }
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f).height(36.dp),
+                        colors = ButtonDefaults.outlinedButtonColors()
+                    ) { Text("Cancel") }
+                }
+            }
+            if (editError.isNotEmpty()) {
+                item {
+                    Text(
+                        editError,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.clickable { editError = "" }
+                    )
+                }
+            }
+        }
+    }
+}

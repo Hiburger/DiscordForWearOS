@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace "com.zaffox.discordwear"
+    namespace "com.hiburger.discordwear"
     compileSdk 36
     buildToolsVersion "36.0.0"
 
@@ -16,7 +16,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.zaffox.discordwear"
+        applicationId "com.hiburger.discordwear"
         minSdk 30
         targetSdk 36
         versionCode 16
